@@ -43,6 +43,23 @@ mkdir -p "$REPO/.opencode/commands"
 cp "$KIT/opencode-commands/"superdev-*.md "$REPO/.opencode/commands/" 2>/dev/null || true
 echo "skills: installed to .claude/skills/ + .agents/skills/ (+ .opencode/commands)"
 
+# 3c. Evals (tier-1 telemetry + audits run FROM the kit; repo only needs state)
+grep -qx 'superdev/evals/telemetry.jsonl' "$REPO/.gitignore" 2>/dev/null \
+  || echo 'superdev/evals/telemetry.jsonl' >> "$REPO/.gitignore"
+mkdir -p "$REPO/superdev/evals/reports"
+touch "$REPO/superdev/evals/reports/.gitkeep"
+if ! grep -q '^evals:' "$REPO/superdev/kbforge.yaml"; then
+  cat >> "$REPO/superdev/kbforge.yaml" <<'EOF'
+evals:
+  report_window_days: 14
+  telemetry_retention_days: 90
+  min_recall_rate: 0.70
+  min_precision: 0.80
+  judge_sample_size: 20
+EOF
+fi
+echo "evals: gitignore + kbforge.yaml evals block + reports dir ensured"
+
 # 3b. Codex explicit /superdev-* prompts (user-global, once per machine; Codex has
 #     no repo-level prompts — its native path is .agents/skills above)
 mkdir -p "$HOME/.codex/prompts"
