@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Superdev Harness — Development Workflow Execution</title>
+<style>
+  :root {
+    --paper: #F2F4F6; --ink: #212B36; --ink-soft: #4A5865; --line: #D4DAE0;
+    --card: #FAFBFC; --mono-bg: #E8ECEF;
+    --accent: #2E6E56; --accent-ink: #FFFFFF;
+    --ratified: #2E6E56; --pending: #9A6A1F; --challenged: #A8432F; --derived: #5B7186;
+    --chip-agent: #33556E; --chip-hook: #2E6E56; --chip-founder: #7A4A94; --chip-machine: #5B7186;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #141A20; --ink: #DCE4EA; --ink-soft: #93A3B1; --line: #2C3843;
+      --card: #1B232B; --mono-bg: #232D36;
+      --accent: #4E9C7E; --accent-ink: #0E1418;
+      --ratified: #4E9C7E; --pending: #C4924A; --challenged: #C86A55; --derived: #7E95A8;
+      --chip-agent: #6E93B0; --chip-hook: #4E9C7E; --chip-founder: #A97FC4; --chip-machine: #7E95A8;
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #F2F4F6; --ink: #212B36; --ink-soft: #4A5865; --line: #D4DAE0;
+    --card: #FAFBFC; --mono-bg: #E8ECEF;
+    --accent: #2E6E56; --accent-ink: #FFFFFF;
+    --ratified: #2E6E56; --pending: #9A6A1F; --challenged: #A8432F; --derived: #5B7186;
+    --chip-agent: #33556E; --chip-hook: #2E6E56; --chip-founder: #7A4A94; --chip-machine: #5B7186;
+  }
+  :root[data-theme="dark"] {
+    --paper: #141A20; --ink: #DCE4EA; --ink-soft: #93A3B1; --line: #2C3843;
+    --card: #1B232B; --mono-bg: #232D36;
+    --accent: #4E9C7E; --accent-ink: #0E1418;
+    --ratified: #4E9C7E; --pending: #C4924A; --challenged: #C86A55; --derived: #7E95A8;
+    --chip-agent: #6E93B0; --chip-hook: #4E9C7E; --chip-founder: #A97FC4; --chip-machine: #7E95A8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15.5px; line-height: 1.55;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 48px 24px 80px; }
+  h1, h2 {
+    font-family: "Avenir Next", "Futura", "Century Gothic", system-ui, sans-serif;
+    text-wrap: balance; line-height: 1.15;
+  }
+  h1 { font-size: 32px; font-weight: 600; margin: 8px 0 10px; }
+  h2 { font-size: 21px; font-weight: 600; margin: 0 0 4px; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600;
+  }
+  .lede { color: var(--ink-soft); max-width: 64ch; margin: 0; }
+  .loopline {
+    margin: 26px 0 0; padding: 14px 18px; background: var(--card);
+    border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    border-radius: 6px; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px; color: var(--ink-soft); overflow-x: auto; white-space: nowrap;
+  }
+  .loopline b { color: var(--ink); font-weight: 600; }
+  section { margin-top: 56px; }
+  .sec-head { margin-bottom: 22px; }
+  .sec-head p { color: var(--ink-soft); margin: 6px 0 0; max-width: 66ch; }
+
+  /* timeline */
+  .stage { display: grid; grid-template-columns: 56px 1fr; gap: 0 20px; position: relative; }
+  .stage:not(:last-child) { padding-bottom: 34px; }
+  .stage:not(:last-child)::before {
+    content: ""; position: absolute; left: 27px; top: 40px; bottom: 0;
+    width: 2px; background: var(--line);
+  }
+  .marker {
+    width: 56px; height: 40px; border-radius: 8px; background: var(--card);
+    border: 1.5px solid var(--line); display: flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 700; font-size: 15px;
+    color: var(--accent);
+  }
+  .stage.auto .marker { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .stage-body { padding-top: 6px; }
+  .stage-title-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10.5px;
+    letter-spacing: .06em; text-transform: uppercase; font-weight: 600;
+    padding: 2px 8px; border-radius: 99px; color: var(--paper);
+  }
+  .chip.agent { background: var(--chip-agent); }
+  .chip.hook { background: var(--chip-hook); }
+  .chip.founder { background: var(--chip-founder); }
+  .chip.machine { background: var(--chip-machine); }
+  .stage-body p { margin: 8px 0 0; color: var(--ink-soft); max-width: 62ch; }
+  .stage-body p b { color: var(--ink); font-weight: 600; }
+  .artifact {
+    margin-top: 12px; background: var(--mono-bg); border-radius: 6px;
+    padding: 10px 14px; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12.5px; line-height: 1.7; color: var(--ink); overflow-x: auto;
+  }
+  .artifact .dim { color: var(--ink-soft); }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .88em;
+    background: var(--mono-bg); padding: 1px 5px; border-radius: 4px;
+  }
+
+  /* tables */
+  .tblwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+  th {
+    text-align: left; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-soft); padding: 12px 16px; border-bottom: 1px solid var(--line);
+  }
+  td { padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink-soft); }
+  td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td .yes { color: var(--ratified); font-weight: 600; }
+  td .via { color: var(--ink-soft); }
+
+  /* trust pills */
+  .pill {
+    display: inline-block; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 99px;
+    border: 1.5px solid; white-space: nowrap;
+  }
+  .pill.ratified { color: var(--ratified); border-color: var(--ratified); }
+  .pill.pending { color: var(--pending); border-color: var(--pending); }
+  .pill.challenged { color: var(--challenged); border-color: var(--challenged); }
+  .pill.derived { color: var(--derived); border-color: var(--derived); }
+  .flow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .flow .arr { color: var(--ink-soft); font-family: ui-monospace, monospace; }
+  .lifecycle-note { margin-top: 14px; color: var(--ink-soft); font-size: 14px; max-width: 66ch; }
+
+  footer {
+    margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--line);
+    color: var(--ink-soft); font-size: 13px;
+  }
+  footer code { font-size: 12px; }
+  @media (max-width: 560px) {
+    .stage { grid-template-columns: 40px 1fr; gap: 0 14px; }
+    .marker { width: 40px; height: 34px; font-size: 13px; }
+    .stage:not(:last-child)::before { left: 19px; top: 34px; }
+  }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">superdev harness · signalcue</div>
+    <h1>How a development session executes</h1>
+    <p class="lede">One product repo carries its own trust-graded knowledge base in <code>superdev/</code>. Every coding session — Claude Code, Codex, or OpenCode — runs the same loop: ground in ratified truth, build, capture judgment, commit through the guard, and let the machine re-measure the world. Three parts: install the harness once, bootstrap the KB's judgment, then every session runs the steady-state loop.</p>
+    <div class="loopline"><b>brief</b> → <b>recall</b> → build → <b>decide/diverge</b> → commit ⛔<span class="dim">lane&nbsp;guard</span> → <span class="dim">ship&nbsp;loop:</span> drift → re-pin → harvest → <b>kb: commit</b> → queue → <b>founder ratifies</b> → feeds next session</div>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">part i · installation</div>
+      <h2>From bare repo to armed harness</h2>
+      <p>Two entry points: <code>kbforge-init.sh &lt;repo&gt;</code> for a new product (runs P1–P4 end to end), <code>session-kit/install.sh</code> to re-arm a fresh clone. Everything mechanical; under an hour, mostly harvesters running.</p>
+    </div>
+    <div class="tblwrap"><table>
+      <tr><th>Phase</th><th>What runs</th><th>Output</th><th>Frequency</th></tr>
+      <tr><td>P0 · Tooling</td><td>kb-forge lives centrally at <code>~/superdev/kb-forge</code> (python3, git; optionally ruff)</td><td>the product-agnostic factory</td><td>once per machine</td></tr>
+      <tr><td>P1 · Scaffold</td><td><code>kbforge-init.sh /path/to/repo</code> creates the <code>superdev/</code> skeleton; human edits <code>kbforge.yaml</code> — components and <code>risk_paths</code> (the auth/money/truth patterns that deserve paranoia)</td><td>lanes: <code>kb/derived · inferred · normative · decisions</code>, <code>ledger/</code>, <code>QUEUE.md</code></td><td>once per product</td></tr>
+      <tr><td>P2 · Mechanical seed</td><td><code>seed0</code> + <code>assume0</code> + <code>dup0</code> — deterministic harvesters, no LLM, reading a <code>git archive</code> snapshot, never the working tree</td><td><code>kb/derived/</code> @ pin: routes, models, tests, churn, decision residue, duplicate candidates</td><td>minutes; re-runs every commit</td></tr>
+      <tr><td>P3 · Wire sessions</td><td>installer appends the <code>AGENTS.md</code> KB section (developers own the rest of the file), ensures <code>CLAUDE.md → @AGENTS.md</code>, installs the four <code>superdev-*</code> procedures to <code>.claude/skills/</code> + <code>.agents/skills/</code> + <code>.opencode/commands/</code>, generates <code>KB-STATUS.md</code></td><td>tracked — travels with every clone</td><td>once per product</td></tr>
+      <tr><td>P4 · Arm the clone</td><td>git hooks (<code>pre-commit</code> lane guard, <code>post-commit</code> ship loop) + <code>.claude/settings.local.json</code> (Claude live hooks)</td><td>untracked by design — git does not version hooks</td><td><b>every fresh clone / machine</b></td></tr>
+    </table></div>
+    <p class="lifecycle-note">An unarmed clone loses automation, not correctness: the KB, rules, and procedures are tracked and present; only the hooks need re-arming — until then, CI running the same lane check is the backstop.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">part ii · kb building</div>
+      <h2>The judgment bootstrap — where the KB earns its trust</h2>
+      <p>Installation captures what a machine can know; this phase captures what only the creator knows. Human-paced, run once per product, in this order — deterministic harvest always precedes generative interpretation, and nothing enters <span class="pill ratified">ratified</span> except through the founder.</p>
+    </div>
+
+    <div class="stage">
+      <div class="marker">B1</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Interview the creator</h2>
+          <span class="chips"><span class="chip founder">founder</span><span class="chip agent">agent</span></span></div>
+        <p>Short question rounds capture identity, stage, monetization, and the invariants — the facts no repo scan can produce. Answers land in the founder's own words as <code>kb/normative/00-product-intent.md</code> and <code>01-invariants.md</code> (INV-1…5), provenance <b>elicited</b>: code changes can never invalidate them, only diverge from them.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="marker">B2</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Extraction passes</h2>
+          <span class="chips"><span class="chip agent">agent</span></span></div>
+        <p>Agents read the repo <b>only at the pin</b> and draft the maps every future session will lean on: strategy rationale from docs, the capability map (marketing promises vs actual handlers), data sources ("do we already have this data?"), and integrations (why each exists, which vendor capabilities are used, who depends on what). Every claim cited <code>path:line @pin</code>; everything enters as <span class="pill pending">pending-ratification</span>.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="marker">B3</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Assumption excavation</h2>
+          <span class="chips"><span class="chip machine">machine</span><span class="chip agent">agent</span></span></div>
+        <p>Brownfield code has lost its tradeoffs; the residue hasn't. <code>assume0</code> harvests the scars — frozen constants, timing values, swallowed exceptions, deleted files, reverts — and an agent turns the most decision-laden into hypothesis cards: assumption, evidence, implicitly rejected alternative, cost if wrong, and <b>one question the founder can answer in a sentence</b>.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="marker">B4</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Consistency excavation</h2>
+          <span class="chips"><span class="chip machine">machine</span><span class="chip agent">agent</span></span></div>
+        <p><code>dup0</code> + linters harvest candidates; an agent classifies them — contradiction, duplicate-debt, deliberate variation, or noise — and drafts <b>proposed conventions</b>. A norm binds only once ratified: rejected norms are recorded too, so no agent proposes them again.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="marker">B5</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Confrontation &amp; ratification</h2>
+          <span class="chips"><span class="chip founder">founder</span></span></div>
+        <p>The batches land in <code>QUEUE.md</code> as numbered, evidence-anchored questions — a sitting of twenty answers, not an essay. <code>superdev-ratify</code> walks them: facts promote to <span class="pill ratified">ratified</span>, hypotheses get killed on the record, divergences get ruled (<code>fix-code | fix-model | accepted-deviation</code>) into <code>ledger/</code>. From here the ratchet is closed: the steady-state loop below keeps the KB honest commit by commit.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">part iii · steady-state execution</div>
+      <h2>The seven stages of one unit of work</h2>
+      <p>Stages 0–3 are the working session; stage 4 is the chokepoint; stages 5–6 run after the session, one automatic and one human-paced.</p>
+    </div>
+
+    <div class="stage">
+      <div class="marker">0</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Session start — the briefing</h2>
+          <span class="chips"><span class="chip hook">hook</span><span class="chip agent">agent</span></span></div>
+        <p>The agent opens in the repo and learns the KB exists before writing a line. Claude Code gets a live <b>SessionStart injection</b>; Codex and OpenCode read the same facts from <code>AGENTS.md</code> → <code>superdev/KB-STATUS.md</code>, which the ship loop keeps current as of the last commit.</p>
+        <div class="artifact">KB pin: <b>304da09</b> | last code commit: <b>304da09</b> (in sync)<br>Open adjudication items: <b>13</b> (superdev/QUEUE.md)<br>Ratified invariants: INV-1 immutable calls ledger · INV-2 hedged advice line · INV-3 signalcue.io · INV-4 best-effort alerts</div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="marker">1</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Ground the task — superdev-recall</h2>
+          <span class="chips"><span class="chip agent">agent</span></span></div>
+        <p>Before touching a module, the agent walks the memory palace: anchors on every KB fact are matched against the files about to change, returning facts in <b>trust order</b>. Ratified facts are restated as constraints in the plan. <b>NO&nbsp;COVERAGE</b> on a risk path is a stop sign — check the data-source and integration maps for existing capability, record the gap, then proceed.</p>
+        <div class="artifact"><span class="dim">$</span> python3 ~/superdev/kb-forge/recall.py --config superdev/kbforge.yaml \<br>&nbsp;&nbsp;&nbsp;&nbsp;--files backend/worker/tasks/generate_velocity_whisper.py<br>[ratified&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;] kb/normative/01-invariants.md &nbsp;&lt;- backend/worker/tasks<br>[pending-ratification] kb/inferred/08-consistency.md &nbsp;&lt;- backend/worker</div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="marker">2</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Build — with facts arriving on contact</h2>
+          <span class="chips"><span class="chip agent">agent</span><span class="chip hook">hook</span></span></div>
+        <p>Normal coding. In Claude Code, every <code>Edit</code>/<code>Write</code> on a product file fires a <b>PostToolUse hook</b> that injects the anchored facts for exactly that file — including into subagents, which prose instructions can't reach. Attempts to edit founder lanes are denied at edit time. Codex and OpenCode rely on the procedures plus the git guard downstream.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="marker">3</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Judgment moments — superdev-decide / superdev-diverge</h2>
+          <span class="chips"><span class="chip agent">agent</span></span></div>
+        <p><b>superdev-decide:</b> the moment a tradeoff is made — a threshold fixed, a failure tolerated, an alternative rejected — it lands as an append-only ADR in <code>superdev/kb/decisions/</code>. "Arbitrary" is a valid rationale; invented ones are not. <b>superdev-diverge:</b> if the task conflicts with a ratified fact, the conflicting part stops, the divergence is filed in <code>QUEUE.md</code> with evidence, and a <code>TODO(superdev-diverge&nbsp;#N)</code> marks the hole. Sessions never self-ratify.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="marker">4</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Commit — the chokepoint</h2>
+          <span class="chips"><span class="chip hook">git hook</span></span></div>
+        <p>The <b>pre-commit lane guard</b> runs for every tool and every human. Staged changes to <code>kb/normative/</code>, <code>kb/derived/</code>, or <code>ledger/</code> are rejected unless the commit carries <code>KB_RATIFY=1</code> (a founder ruling) or <code>KB_SHIPLOOP=1</code> (the loop's own re-pin). Prose instructions can be ignored; this cannot.</p>
+        <div class="artifact"><span class="dim">$</span> git commit -m "feat: fix whisper tier gating"<br>KB lane guard: these staged paths are founder/machine lanes:<br>&nbsp;&nbsp;superdev/kb/normative/01-invariants.md<br>Agents: unstage them and propose via superdev/QUEUE.md (superdev-diverge).</div>
+      </div>
+    </div>
+
+    <div class="stage auto">
+      <div class="marker">5</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Ship loop — the world gets re-measured</h2>
+          <span class="chips"><span class="chip machine">machine · no llm</span><span class="chip hook">git hook</span></span></div>
+        <p>Fires automatically on every code commit, backgrounded, deterministic. <b>Order matters:</b> drift runs against the <em>old</em> pin first — subtractive drift (cited lines changed → demote to challenged) and additive drift (new integrations, constants, swallowed exceptions the KB doesn't cover). Then <code>seed0</code> re-pins, <code>assume0</code>/<code>dup0</code> re-harvest residue, the status file refreshes, and the loop commits <code>superdev/</code> as a <code>kb:</code> commit. Guards: KB-only commits never re-trigger it; worktree commits skip; a lockfile collapses bursts.</p>
+        <div class="artifact">drift&nbsp;&nbsp;<span class="dim">pin 304da09 → last code commit &lt;new&gt; · stale citations → QUEUE, new surface → QUEUE</span><br>seed0&nbsp;&nbsp;<span class="dim">re-pin derived layer @ new sha (snapshot, never the dirty tree)</span><br>assume0/dup0&nbsp;&nbsp;<span class="dim">re-harvest decision residue + duplicate candidates</span><br>kb-status&nbsp;&nbsp;<span class="dim">refresh KB-STATUS.md</span> → <b>git commit "kb: ship-loop re-pin @&lt;sha&gt;"</b></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="marker">6</div>
+      <div class="stage-body">
+        <div class="stage-title-row"><h2>Adjudicate — superdev-ratify</h2>
+          <span class="chips"><span class="chip founder">founder</span></span></div>
+        <p>Human-paced, not commit-paced. The founder walks <code>QUEUE.md</code> — divergences, confrontation batches, staleness flags — one item at a time, highest consequence first. Rulings land in their lanes: facts promote to <code>kb/normative/</code>, divergences to <code>ledger/DIV-*</code> with <code>fix-code | fix-model | accepted-deviation</code>, conventions gain scope. The commit carries <code>KB_RATIFY=1</code>, and every future session's stage 0 inherits the result. <b>This is the only door into ratified truth.</b></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">enforcement model</div>
+      <h2>Three layers, by guarantee strength</h2>
+      <p>Instruction conflicts can degrade coverage; they can never degrade correctness — the guarantees don't live in prose.</p>
+    </div>
+    <div class="tblwrap"><table>
+      <tr><th>Layer</th><th>Mechanism</th><th>If an agent ignores it</th></tr>
+      <tr><td>Guarantees</td><td>git <code>pre-commit</code> lane guard · <code>post-commit</code> ship loop — fire for every tool and every human</td><td>It can't. Commits to founder lanes are rejected; write-back runs regardless.</td></tr>
+      <tr><td>Awareness</td><td><code>AGENTS.md</code> KB section (all three tools) · <code>KB-STATUS.md</code> auto-refreshed briefing · Claude SessionStart injection</td><td>Facts still arrive on contact (Claude) or at the git chokepoint; the agent just works less informed.</td></tr>
+      <tr><td>Procedures</td><td><code>superdev-recall</code> · <code>superdev-decide</code> · <code>superdev-diverge</code> · <code>superdev-ratify</code> — Claude skills, Codex prompts, OpenCode commands, one source</td><td>Coverage loss: decisions go uncaptured, gaps unfiled — caught later by drift and excavation, at higher cost.</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">trust lifecycle</div>
+      <h2>How a fact earns (and loses) authority</h2>
+    </div>
+    <div class="flow">
+      <span class="pill derived">derived</span><span class="arr">machine-harvested, certain at pin — regenerated, never argued with</span>
+    </div>
+    <div class="flow">
+      <span class="pill pending">pending-ratification</span><span class="arr">→</span>
+      <span class="pill ratified">ratified</span><span class="arr">founder ruling via QUEUE — the only promotion path</span>
+    </div>
+    <div class="flow">
+      <span class="pill ratified">ratified</span><span class="arr">→</span>
+      <span class="pill challenged">challenged</span><span class="arr">drift or contradiction → re-verify or demote; never silently updated</span>
+    </div>
+    <p class="lifecycle-note">Elicited facts (the founder's own words) are never invalidated by code changes — only flagged when new code diverges from them. Decisions are append-only; a reversal is a new record citing the old one.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">tool matrix</div>
+      <h2>Same loop, three agents</h2>
+    </div>
+    <div class="tblwrap"><table>
+      <tr><th>Capability</th><th>Claude Code</th><th>Codex CLI</th><th>OpenCode</th></tr>
+      <tr><td>Rules at session start</td><td><span class="yes">✓</span> <span class="via">CLAUDE.md → @AGENTS.md + live briefing injection</span></td><td><span class="yes">✓</span> <span class="via">AGENTS.md → KB-STATUS.md</span></td><td><span class="yes">✓</span> <span class="via">AGENTS.md → KB-STATUS.md</span></td></tr>
+      <tr><td>Procedures</td><td><span class="yes">✓</span> <span class="via">skills (.claude/skills/)</span></td><td><span class="yes">✓</span> <span class="via">/superdev-* prompts</span></td><td><span class="yes">✓</span> <span class="via">/superdev-* commands (.opencode/)</span></td></tr>
+      <tr><td>Facts injected on edit</td><td><span class="yes">✓</span> <span class="via">PostToolUse hook, incl. subagents</span></td><td>— <span class="via">procedure + git guard</span></td><td>— <span class="via">plugin port possible</span></td></tr>
+      <tr><td>Lane protection</td><td><span class="yes">✓✓</span> <span class="via">edit-time deny + git guard</span></td><td><span class="yes">✓</span> <span class="via">git guard</span></td><td><span class="yes">✓</span> <span class="via">git guard</span></td></tr>
+      <tr><td>Write-back on commit</td><td><span class="yes">✓</span> <span class="via">ship loop</span></td><td><span class="yes">✓</span> <span class="via">ship loop</span></td><td><span class="yes">✓</span> <span class="via">ship loop</span></td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">write lanes</div>
+      <h2>Who may write where</h2>
+    </div>
+    <div class="tblwrap"><table>
+      <tr><th>Lane</th><th>Writer</th><th>Content</th></tr>
+      <tr><td><code>QUEUE.md</code></td><td>agents (append) · founder (rule)</td><td>the one adjudication queue — divergences, gaps, batches, staleness</td></tr>
+      <tr><td><code>kb/decisions/</code></td><td>agents · founder</td><td>ADR-lite tradeoffs, captured at decision time, append-only</td></tr>
+      <tr><td><code>kb/inferred/</code></td><td>agents</td><td>hypothesis drafts — always <span class="pill pending">pending-ratification</span></td></tr>
+      <tr><td><code>kb/normative/</code></td><td>founder only <span class="via">(KB_RATIFY=1)</span></td><td>ratified intent, invariants, conventions</td></tr>
+      <tr><td><code>kb/derived/</code></td><td>machine only <span class="via">(KB_SHIPLOOP=1)</span></td><td>harvested facts @ pin — regenerated wholesale</td></tr>
+      <tr><td><code>ledger/</code></td><td>founder only <span class="via">(KB_RATIFY=1)</span></td><td>ruled divergences with revisit triggers</td></tr>
+    </table></div>
+  </section>
+
+  <footer>
+    Pin convention: the KB understands the world as of the <b>last code commit</b> (<code>git log -1 -- . ':(exclude)superdev'</code>) — KB commits never move it, uncommitted code is not a fact. Code-only history: <code>git log -- ':(exclude)superdev'</code>. Tooling: <code>~/superdev/kb-forge</code> (SPEC.md); new product: <code>kbforge-init.sh &lt;repo&gt;</code>; fresh clone: <code>session-kit/install.sh</code>.
+  </footer>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,19 @@
+#!/bin/sh
+# kb-forge-hook: KB lane guard (git pre-commit) — the agent-agnostic chokepoint.
+# Founder/machine KB lanes may only be committed by the ship loop
+# (KB_SHIPLOOP=1) or an explicit founder ratification (KB_RATIFY=1).
+# Works for commits from ANY tool: Claude Code, Codex, OpenCode, or a human.
+[ -n "$KB_SHIPLOOP" ] && exit 0
+[ -n "$KB_RATIFY" ] && exit 0
+git rev-parse --verify HEAD >/dev/null 2>&1 || exit 0   # initial commit: skip
+
+BLOCKED=$(git diff --cached --name-only | grep -E '^superdev/(kb/normative/|kb/derived/|ledger/)' )
+[ -z "$BLOCKED" ] && exit 0
+
+echo "KB lane guard: these staged paths are founder/machine lanes:" >&2
+echo "$BLOCKED" | sed 's/^/  /' >&2
+echo "" >&2
+echo "Agents: unstage them and propose the change via superdev/QUEUE.md" >&2
+echo "        (superdev-diverge procedure). Ratification is human-only." >&2
+echo "Founder ratifying deliberately:  KB_RATIFY=1 git commit ..." >&2
+exit 1

@@ -1,0 +1,180 @@
+<title>Agentic SDLC — Two Systems Compared</title>
+<style>
+  :root{
+    --ground:#eef2f8; --panel:#ffffff; --panel2:#f5f8fc; --line:#dce4ef;
+    --ink:#16233a; --ink2:#2a3a54; --muted:#556682; --faint:#8695ab;
+    --local:#0d9488; --local-d:#0b6b62; --local-bg:#e6faf5; --local-b:#8fe4d7;
+    --cloud:#4338ca; --cloud-d:#3730a3; --cloud-bg:#eef0fd; --cloud-b:#c3c6f4;
+    --same:#15803d; --same-bg:#f0faf3; --same-b:#bbe3c6;
+  }
+  *{box-sizing:border-box}
+  .wrap{
+    background:radial-gradient(900px 480px at 12% -10%,#dcf3ee 0%,transparent 55%),
+               radial-gradient(900px 480px at 92% -10%,#e6e7fb 0%,transparent 55%),
+               var(--ground);
+    color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55; padding:44px 20px 64px; min-height:100%;
+  }
+  .inner{max-width:940px;margin:0 auto}
+  .num{font-variant-numeric:tabular-nums}
+  .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:700;text-align:center}
+  h1{font-size:clamp(25px,4.4vw,36px);margin:.28em 0 .12em;letter-spacing:-.015em;text-align:center;text-wrap:balance}
+  .sub{color:var(--muted);font-size:14.5px;max-width:70ch;margin:0 auto;text-align:center}
+
+  h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:38px 0 12px;text-align:center}
+
+  /* definition cards */
+  .defs{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px}
+  .def{background:var(--panel);border:1px solid var(--line);border-top:4px solid;border-radius:14px;padding:18px 20px;box-shadow:0 2px 8px rgba(22,35,58,.06)}
+  .def.local{border-top-color:var(--local)}
+  .def.cloud{border-top-color:var(--cloud)}
+  .def .tag{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+  .def.local .tag{color:var(--local-d)} .def.cloud .tag{color:var(--cloud-d)}
+  .def h3{margin:6px 0 4px;font-size:19px;letter-spacing:-.01em}
+  .def .idea{font-size:13.5px;color:var(--ink2);margin:0 0 12px}
+  .def .idea b{color:var(--ink)}
+  .def dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:12.5px}
+  .def dt{color:var(--faint);font-weight:600;white-space:nowrap}
+  .def dd{margin:0;color:var(--ink2)}
+  .def .price{margin-top:14px;font-size:13px;color:var(--muted)}
+  .def .price b{font-size:20px;letter-spacing:-.01em}
+  .def.local .price b{color:var(--local-d)} .def.cloud .price b{color:var(--cloud-d)}
+
+  /* shared core band */
+  .core{margin:16px 0 0;background:var(--same-bg);border:1px solid var(--same-b);border-radius:12px;padding:14px 18px;display:flex;gap:12px;align-items:flex-start}
+  .core .k{font-size:22px}
+  .core b{color:var(--same)}
+  .core p{margin:0;font-size:13.5px;color:var(--ink2)}
+  .core .chips{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+  .core .chip{font-size:11.5px;padding:2px 9px;border-radius:6px;background:#fff;border:1px solid var(--same-b);color:var(--same);font-weight:600}
+
+  /* contrast table */
+  .tbl{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  thead th{font-size:12px;letter-spacing:.03em;font-weight:800}
+  th.dim{background:var(--panel2);color:var(--muted);text-transform:uppercase;font-size:11px;width:20%}
+  th.hl{background:var(--local-bg);color:var(--local-d)}
+  th.hc{background:var(--cloud-bg);color:var(--cloud-d)}
+  td.dim{background:var(--panel2);color:var(--ink2);font-weight:700;font-size:12.5px}
+  td.cl{border-left:2px solid var(--local-b)}
+  td.cc{border-left:2px solid var(--cloud-b)}
+  tr.same td.cl,tr.same td.cc{background:var(--same-bg)}
+  .eq{display:inline-block;font-size:10.5px;font-weight:700;color:var(--same);border:1px solid var(--same-b);border-radius:5px;padding:0 5px;margin-right:5px;vertical-align:1px}
+
+  /* tiers */
+  .tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .tier{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 16px;box-shadow:0 1px 3px rgba(22,35,58,.05);position:relative}
+  .tier .t{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--local-d)}
+  .tier.walk .t{color:#0e7490} .tier.run .t{color:var(--cloud-d)}
+  .tier .big{font-size:20px;font-weight:800;margin:4px 0 2px;letter-spacing:-.01em}
+  .tier .per{font-size:12px;color:var(--faint)}
+  .tier ul{margin:9px 0 0;padding-left:16px;font-size:12.5px;color:var(--ink2)}
+  .tier li{margin:3px 0}
+  .arrow{text-align:center;color:var(--faint);font-size:13px;margin:10px 0 2px;font-weight:600;letter-spacing:.02em}
+
+  .callout{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--local);border-radius:10px;padding:15px 17px;margin-top:14px;font-size:14px;color:var(--ink2)}
+  .callout b{color:var(--ink)}
+  .foot{margin-top:26px;padding-top:16px;border-top:1px solid var(--line);color:var(--faint);font-size:12px;text-align:center}
+  @media(max-width:660px){.defs,.tiers{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap"><div class="inner">
+  <div class="eyebrow">Agentic SDLC · Two Ways to Build It</div>
+  <h1>Local Dev-in-the-Loop &nbsp;vs&nbsp; Cloud Autonomous</h1>
+  <p class="sub">Same brain, two bodies. One puts a developer in the driver's seat on a laptop; the other runs an autonomous pipeline in the cloud. They share a core — so you can start with one and grow into the other without rework.</p>
+
+  <div class="defs">
+    <div class="def local">
+      <div class="tag">System 1 · Local</div>
+      <h3>Dev-in-the-Loop</h3>
+      <p class="idea"><b>The developer is the control plane.</b> One agent on a laptop, driven interactively through spec → code → test, reviewed continuously, shipped via your existing CI.</p>
+      <dl>
+        <dt>Control plane</dt><dd>the developer</dd>
+        <dt>Runtime</dt><dd>laptop + existing Azure Pipelines</dd>
+        <dt>Agent</dt><dd>one (Claude Code / Cline), plays all roles</dd>
+        <dt>Autonomy</dt><dd>human in the loop, every task (L0–L1)</dd>
+        <dt>Throughput</dt><dd>capped at developer hours</dd>
+        <dt>Governance</dt><dd>human is the gate · git + PR + CI audit</dd>
+      </dl>
+      <p class="price">Small team: <b class="num">~$600–1k</b> / month</p>
+    </div>
+
+    <div class="def cloud">
+      <div class="tag">System 2 · Cloud</div>
+      <h3>Autonomous Pipeline</h3>
+      <p class="idea"><b>An orchestrator is the control plane.</b> A fleet of ephemeral stage agents takes a ticket from spec to production autonomously, behind guardrails, with humans on the loop.</p>
+      <dl>
+        <dt>Control plane</dt><dd>Orchestrator service (Agent SDK)</dd>
+        <dt>Runtime</dt><dd>Azure control + ephemeral data planes</dd>
+        <dt>Agents</dt><dd>fleet: PM→Spec→Design→Coder→…→Monitor</dd>
+        <dt>Autonomy</dt><dd>autonomous-to-prod, human on the loop (L2–L3)</dd>
+        <dt>Throughput</dt><dd>parallel fleet · unattended / overnight</dd>
+        <dt>Governance</dt><dd>automated gates · immutable audit ledger</dd>
+      </dl>
+      <p class="price">Scaled: <b class="num">~$20–40k</b> / month <span style="font-size:12px">(pilot ~$5–8k)</span></p>
+    </div>
+  </div>
+
+  <div class="core">
+    <span class="k">🧠</span>
+    <div>
+      <b>They share the same core — local is a subset, not a rewrite.</b>
+      <p>The knowledge base, skills, specs, and gates are <b>identical</b>. Local runs them on a laptop and in your existing CI; cloud runs them on a fleet. So nothing built for one is wasted moving to the other — you add autonomy <em>around</em> the same core.</p>
+      <div class="chips"><span class="chip">Code graph / KB</span><span class="chip">Skills</span><span class="chip">Spec-as-code</span><span class="chip">Gates (OPA · tests · oasdiff · Pact)</span><span class="chip">Compliance envelope</span></div>
+    </div>
+  </div>
+
+  <h2>Side by side</h2>
+  <div class="tbl">
+    <table>
+      <thead><tr><th class="dim">Dimension</th><th class="hl">Local · Dev-in-the-Loop</th><th class="hc">Cloud · Autonomous</th></tr></thead>
+      <tbody>
+        <tr><td class="dim">Control plane</td><td class="cl">The developer — drives every task</td><td class="cc">Orchestrator service — dispatches stages</td></tr>
+        <tr><td class="dim">Where it runs</td><td class="cl">Laptop + your existing CI/CD</td><td class="cc">Azure control plane + ephemeral workers + dedicated cluster</td></tr>
+        <tr><td class="dim">Agents</td><td class="cl">One agent, human-driven, plays all roles</td><td class="cc">Fleet of ephemeral stage agents</td></tr>
+        <tr class="same"><td class="dim"><span class="eq">SAME</span>Knowledge base</td><td class="cl">Serena code graph + index, locally</td><td class="cc">Serena + Atlas, dedicated cluster</td></tr>
+        <tr class="same"><td class="dim"><span class="eq">SAME</span>Skills &amp; specs</td><td class="cl">Skills-as-code + spec-as-code in repo</td><td class="cc">Skills-as-code + spec-as-code in repo</td></tr>
+        <tr class="same"><td class="dim"><span class="eq">SAME</span>Gates</td><td class="cl">Run in Azure Pipelines on the PR</td><td class="cc">Run in ephemeral workers + Pipelines</td></tr>
+        <tr><td class="dim">Autonomy</td><td class="cl">Human in the loop, every task (L0–L1)</td><td class="cc">Autonomous-to-prod; human on the loop (L2–L3)</td></tr>
+        <tr><td class="dim">Throughput</td><td class="cl">Capped at developer hours</td><td class="cc">Parallel fleet · unattended · overnight</td></tr>
+        <tr><td class="dim">Governance / audit</td><td class="cl">Human is the gate · git + PR + CI logs</td><td class="cc">Automated guardrails · immutable ledger</td></tr>
+        <tr><td class="dim">Drift maintenance</td><td class="cl">Manual / none</td><td class="cc">Autonomous Drift Reconciler + Monitor</td></tr>
+        <tr><td class="dim">Compliance envelope</td><td class="cl">Code + specs only, never finance data</td><td class="cc">Code + specs only, never finance data</td></tr>
+        <tr><td class="dim">Cost / month</td><td class="cl num"><b>~$600–1k</b> (small team, flat)</td><td class="cc num"><b>~$20–40k</b> scaled · ~$5–8k pilot</td></tr>
+        <tr><td class="dim">Best for</td><td class="cl">Getting value now · bootstrapping the KB/skills/specs · low risk</td><td class="cc">Scale beyond headcount · unattended autonomy · self-maintenance</td></tr>
+        <tr><td class="dim">Can't do</td><td class="cl">Overnight / parallel-fleet / auto-maintenance</td><td class="cc">— (heavier, costlier, more to build)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>You don't choose — you graduate</h2>
+  <div class="tiers">
+    <div class="tier crawl">
+      <div class="t">Crawl · Local</div>
+      <div class="big num">~$600–1k<span class="per"> /mo</span></div>
+      <div class="per">dev-in-the-loop on laptops</div>
+      <ul><li>Value in weeks</li><li>Bootstraps KB / skills / specs</li><li>Near-zero risk</li></ul>
+    </div>
+    <div class="tier walk">
+      <div class="t">Walk · Hybrid</div>
+      <div class="big num">~$1–3k<span class="per"> /mo</span></div>
+      <div class="per">local agents + shared KB + cloud gates</div>
+      <ul><li>Shared knowledge across team</li><li>Centralized gates</li><li>First drift detection</li></ul>
+    </div>
+    <div class="tier run">
+      <div class="t">Run · Cloud</div>
+      <div class="big num">~$20–40k<span class="per"> /mo</span></div>
+      <div class="per">full autonomous pipeline</div>
+      <ul><li>Autonomy at scale</li><li>Unattended / overnight runs</li><li>Self-maintaining (drift)</li></ul>
+    </div>
+  </div>
+  <div class="arrow">Crawl → Walk → Run · each tier reuses the prior tier's KB, skills, specs &amp; gates — no rework</div>
+
+  <div class="callout">
+    <b>Recommendation:</b> start at <b>Crawl</b> — cheapest, fastest, lowest-risk, and it builds the exact assets (KB, skills, specs) the cloud system needs. Move to <b>Walk</b> when a shared KB and centralized gates matter across the team. Invest in <b>Run</b> only when throughput-beyond-headcount or unattended autonomy is the explicit goal. <b>Small ask now, big spend deferred until justified.</b>
+  </div>
+
+  <p class="foot">Agentic SDLC · Two systems, one core · code + specs only, never finance data</p>
+</div></div>

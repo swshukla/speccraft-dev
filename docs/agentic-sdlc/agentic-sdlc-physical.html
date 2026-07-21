@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agentic SDLC — Physical Deployment</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%97%84%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --ground: #F4F5F7;
+    --panel: #FBFBFC;
+    --ink: #141A24;
+    --slate: #55606F;
+    --slate-soft: #8A94A2;
+    --hair: #DDE1E7;
+    --hair-strong: #C7CDD6;
+
+    --teal: #0D7377;
+    --teal-line: #7FB4B5;
+
+    --adopt: #2F7D57;  --adopt-soft: #E4F0E9;
+    --adapt: #3A5285;  --adapt-soft: #E6EAF2;
+    --build: #B07807;  --build-soft: #F7EED7;
+    --guard: #A14A4A;  --guard-soft: #F3E4E4;
+    --azure: #1668C4;  --azure-soft: #E4EDF9;
+    --ext:   #6B5D8A;  --ext-soft:   #ECE7F3;
+
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 44px 28px 80px; }
+
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--teal); margin: 0 0 12px; }
+  h1 { font-size: clamp(27px, 3.6vw, 40px); line-height: 1.09; letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance; font-weight: 680; }
+  .lede { font-size: 16.5px; color: var(--slate); max-width: 66ch; margin: 0; }
+  .lede strong { color: var(--ink); font-weight: 620; }
+  .meta { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px 22px; font-family: var(--mono); font-size: 12px; color: var(--slate-soft); }
+  .meta b { color: var(--slate); font-weight: 600; }
+  .rule { height: 1px; background: var(--hair); margin: 32px 0; border: 0; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 0 0 26px; }
+  .chip { font-family: var(--mono); font-size: 11px; letter-spacing: 0.03em; padding: 4px 9px; border-radius: 4px; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .chip::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: currentColor; opacity: 0.9; }
+  .c-azure { color: var(--azure); background: var(--azure-soft); border-color: #C6D8F0; }
+  .c-adopt { color: var(--adopt); background: var(--adopt-soft); border-color: #CBE1D5; }
+  .c-adapt { color: var(--adapt); background: var(--adapt-soft); border-color: #CFD8E8; }
+  .c-build { color: var(--build); background: var(--build-soft); border-color: #E8D6A6; }
+  .c-guard { color: var(--guard); background: var(--guard-soft); border-color: #E7C9C9; }
+  .c-ext   { color: var(--ext);   background: var(--ext-soft);   border-color: #D6CEE6; }
+
+  .zones { display: flex; flex-direction: column; gap: 14px; }
+
+  .zone { border: 1px solid var(--hair); border-radius: 13px; padding: 16px 18px 18px; background: var(--panel); position: relative; }
+  .zone.prod   { border-color: #C6D8F0; background: linear-gradient(180deg,#FCFDFF,#F7FAFE); }
+  .zone.ctrl   { border-color: #CFD8E8; background: linear-gradient(180deg,#FCFCFE,#F8F9FC); }
+  .zone.data   { border-color: var(--hair-strong); border-style: dashed; background: #FCFCFD; }
+  .zone.ext    { border-color: #D6CEE6; background: linear-gradient(180deg,#FDFCFE,#F8F6FB); }
+  .zone.edge   { border-color: var(--hair-strong); background: #FCFCFD; }
+
+  .zone-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 13px; flex-wrap: wrap; }
+  .zone-name { font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--slate); margin: 0; display: flex; align-items: center; gap: 8px; }
+  .zone-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; }
+  .zt-prod { color: var(--azure); background: var(--azure-soft); }
+  .zt-ctrl { color: var(--adapt); background: var(--adapt-soft); }
+  .zt-ext  { color: var(--ext);   background: var(--ext-soft); }
+  .zt-edge { color: var(--slate); background: #EEF0F3; }
+  .zone-note { font-size: 12px; color: var(--slate-soft); margin: 0; }
+
+  .cards { display: flex; gap: 11px; flex-wrap: wrap; }
+  .card { flex: 1 1 165px; min-width: 155px; background: #fff; border: 1px solid var(--hair-strong); border-radius: 9px; padding: 12px 12px 11px; display: flex; flex-direction: column; gap: 6px; }
+  .card.build { border-color: #E3C878; background: #FFFCF3; box-shadow: 0 0 0 1px #EAD79A inset; }
+  .card.guard { border-color: #DEBFBF; background: #FFF9F9; }
+  .card.azure { border-color: #C6D8F0; }
+  .card.wide { flex-basis: 100%; }
+
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .card-name { font-family: var(--mono); font-size: 13px; font-weight: 620; letter-spacing: -0.01em; color: var(--ink); }
+  .svc { font-family: var(--mono); font-size: 10px; color: var(--slate-soft); }
+  .card-desc { font-size: 12px; color: var(--slate); margin: 0; }
+  .tag { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; font-weight: 600; white-space: nowrap; }
+  .t-azure { color: var(--azure); background: var(--azure-soft); }
+  .t-adopt { color: var(--adopt); background: var(--adopt-soft); }
+  .t-adapt { color: var(--adapt); background: var(--adapt-soft); }
+  .t-build { color: var(--build); background: var(--build-soft); }
+  .t-guard { color: var(--guard); background: var(--guard-soft); }
+  .t-ext   { color: var(--ext);   background: var(--ext-soft); }
+
+  .flowline { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 3px 0; font-family: var(--mono); font-size: 11px; color: var(--slate-soft); }
+  .flowline .bar { height: 1px; background: var(--hair-strong); flex: 1; max-width: 90px; }
+  .flowline .dir { color: var(--teal); font-size: 13px; }
+
+  .subzone { border: 1px dashed var(--hair-strong); border-radius: 10px; padding: 12px 12px 13px; margin-top: 12px; background: #FCFCFD; }
+  .subzone-head { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--guard); margin: 0 0 9px; display:flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;}
+  .subzone-head .n { font-size: 11.5px; text-transform: none; letter-spacing: 0; color: var(--slate-soft); }
+
+  .gap { margin-top: 14px; border: 1px solid #EBD9A8; background: #FEFBF1; border-radius: 10px; padding: 12px 14px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .gap b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--build); }
+  .gap p { margin: 0; font-size: 12.5px; color: var(--slate); }
+  .gap .item { flex: 1 1 260px; }
+
+  .foot { margin-top: 28px; font-family: var(--mono); font-size: 12px; color: var(--slate-soft); }
+
+  @media (max-width: 640px) { .zone-note { display: none; } }
+  @media (prefers-reduced-motion: no-preference) {
+    .zone { animation: rise 0.5s ease both; }
+    .zone:nth-child(2){animation-delay:.04s} .zone:nth-child(3){animation-delay:.08s}
+    .zone:nth-child(4){animation-delay:.12s} .zone:nth-child(5){animation-delay:.16s}
+    @keyframes rise { from { opacity:0; transform: translateY(8px);} to {opacity:1; transform:none;} }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Agentic SDLC · Physical Deployment · South India</p>
+  <h1>Where every component runs — Azure services, trust zones, and data flow.</h1>
+  <p class="lede">
+    The deployment view on your real infrastructure: <strong>Azure App Service</strong>, <strong>MongoDB Atlas</strong>,
+    <strong>Azure DevOps</strong>, and <strong>JIRA</strong>. Agents run as <strong>in-tenant ephemeral workers</strong>
+    and touch <strong>code and specs only</strong> — no finance data ever leaves for a model. Prod and the agentic planes
+    are isolated by <strong>resource group + VNet</strong> in one subscription for now.
+  </p>
+
+  <div class="meta">
+    <span><b>Region</b> South India (single · backups only, no DR yet)</span>
+    <span><b>Subscription</b> shared (credits) · planes logically isolated</span>
+    <span><b>Deploy</b> staging slot → slot-swap</span>
+  </div>
+
+  <hr class="rule" />
+
+  <div class="legend" aria-label="legend">
+    <span class="chip c-azure">AZURE — in-tenant service</span>
+    <span class="chip c-adopt">ADOPT — OSS</span>
+    <span class="chip c-adapt">ADAPT — wrap/configure</span>
+    <span class="chip c-build">BUILD — bespoke</span>
+    <span class="chip c-guard">GUARDRAIL</span>
+    <span class="chip c-ext">EXTERNAL — egress (DPA)</span>
+  </div>
+
+  <div class="zones">
+
+    <!-- ZONE 0 EDGE -->
+    <div class="zone edge">
+      <div class="zone-head">
+        <p class="zone-name"><span class="zone-tag zt-edge">Zone 0</span> Public edge</p>
+        <p class="zone-note">clients in, TLS + WAF</p>
+      </div>
+      <div class="cards">
+        <div class="card azure">
+          <div class="card-top"><span class="card-name">Front Door + WAF</span><span class="tag t-azure">Azure</span></div>
+          <p class="card-desc">TLS termination, DDoS/WAF, routing to web + API.</p>
+        </div>
+        <div class="card">
+          <div class="card-top"><span class="card-name">Web — Next.js</span><span class="tag t-azure">App Service</span></div>
+          <p class="card-desc">Browser clients for the platform.</p>
+        </div>
+        <div class="card">
+          <div class="card-top"><span class="card-name">Mobile — React Native</span><span class="svc">App / Play Store</span></div>
+          <p class="card-desc">Built &amp; released via Azure Pipelines.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="flowline"><span class="bar"></span><span class="dir">▼</span> private traffic <span class="dir">▼</span><span class="bar"></span></div>
+
+    <!-- ZONE 1 PRODUCTION -->
+    <div class="zone prod">
+      <div class="zone-head">
+        <p class="zone-name"><span class="zone-tag zt-prod">Zone 1</span> Production · VNet + resource group</p>
+        <p class="zone-note">existing system · agents’ deploy target only · holds all regulated data</p>
+      </div>
+      <div class="cards">
+        <div class="card azure">
+          <div class="card-top"><span class="card-name">Monolith API</span><span class="tag t-azure">App Service</span></div>
+          <p class="card-desc">Node monolith. Deploy slots: <b>prod</b> + <b>staging</b> — the canary + one-swap rollback seam.</p>
+        </div>
+        <div class="card azure">
+          <div class="card-top"><span class="card-name">MongoDB Atlas</span><span class="svc">Azure · India</span></div>
+          <p class="card-desc">App data + audit collection (change streams) + telemetry logs + <b>Vector Search</b> (KB semantic layer). Private endpoint.</p>
+        </div>
+        <div class="card build">
+          <div class="card-top"><span class="card-name">◆ feature-flag service</span><span class="tag t-build">Homegrown</span></div>
+          <p class="card-desc">Dark-launch + kill switch. Agents flip flags via its API.</p>
+        </div>
+        <div class="card azure">
+          <div class="card-top"><span class="card-name">Key Vault</span><span class="tag t-azure">Azure</span></div>
+          <p class="card-desc">Secrets via managed identities — no static creds in agents.</p>
+        </div>
+        <div class="card">
+          <div class="card-top"><span class="card-name">Telemetry</span><span class="svc">PostHog + dashboard</span></div>
+          <p class="card-desc">Product analytics + custom dashboard over Mongo telemetry — the Monitor signal.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="flowline"><span class="bar"></span>audit/telemetry read (scoped) <span class="dir">▲</span> &nbsp;·&nbsp; <span class="dir">▼</span> deploy via Azure DevOps<span class="bar"></span></div>
+
+    <!-- ZONE 2 CONTROL PLANE + ZONE 3 DATA PLANE -->
+    <div class="zone ctrl">
+      <div class="zone-head">
+        <p class="zone-name"><span class="zone-tag zt-ctrl">Zone 2</span> Agentic control plane · own RG + VNet</p>
+        <p class="zone-note">persistent · trusted · no code / no prod-data access</p>
+      </div>
+      <div class="cards">
+        <div class="card">
+          <div class="card-top"><span class="card-name">Orchestrator</span><span class="tag t-adapt">Container App</span></div>
+          <p class="card-desc">Agent-SDK state machine; advances stages, enforces gates.</p>
+        </div>
+        <div class="card">
+          <div class="card-top"><span class="card-name">Event bus + state</span><span class="svc">Service Bus · Mongo</span></div>
+          <p class="card-desc">Stage events, pipeline state, escalation routing.</p>
+        </div>
+        <div class="card build">
+          <div class="card-top"><span class="card-name">◆ audit ledger</span><span class="tag t-build">Build</span></div>
+          <p class="card-desc">Append-only Mongo — every prompt, decision, diff, deploy. Evidence trail.</p>
+        </div>
+        <div class="card">
+          <div class="card-top"><span class="card-name">JIRA ⇄ Azure DevOps</span><span class="tag t-adapt">Bridge</span></div>
+          <p class="card-desc">JIRA <code>agent-ready</code> webhook → branch + PR in Azure DevOps → status back to JIRA.</p>
+        </div>
+      </div>
+
+      <div class="subzone">
+        <p class="subzone-head"><span><span class="zone-tag zt-ctrl" style="background:#EEF0F3;color:var(--slate)">Zone 3</span> &nbsp;Data plane · ephemeral sandboxed workers</span><span class="n">one per stage-run · scoped managed identity · torn down after</span></p>
+        <div class="cards">
+          <div class="card">
+            <div class="card-top"><span class="card-name">Sandbox worker</span><span class="tag t-azure">ACI / CA job</span></div>
+            <p class="card-desc">Fresh container, repo checkout, least-privilege identity.</p>
+          </div>
+          <div class="card">
+            <div class="card-top"><span class="card-name">code graph</span><span class="tag t-adopt">Serena</span></div>
+            <p class="card-desc">Symbol/call graph over the checkout (MCP).</p>
+          </div>
+          <div class="card">
+            <div class="card-top"><span class="card-name">Coder</span><span class="tag t-adopt">OpenHands / Cline</span></div>
+            <p class="card-desc">Edits code + tests inside module boundary.</p>
+          </div>
+          <div class="card build">
+            <div class="card-top"><span class="card-name">◆ model gateway</span><span class="tag t-build">Build</span></div>
+            <p class="card-desc">Secret scrubbing + routing + budgets. The foundation→sovereign swap seam.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="subzone" style="border-color:#DEBFBF;">
+        <p class="subzone-head" style="color:var(--guard)"><span>Guardrail gates — in Azure Pipelines</span><span class="n">pass → advance · fail → escalate to JIRA</span></p>
+        <div class="cards">
+          <div class="card guard"><div class="card-top"><span class="card-name">blast radius</span><span class="tag t-guard">Gate</span></div><p class="card-desc">Fails any diff outside the module dir.</p></div>
+          <div class="card guard"><div class="card-top"><span class="card-name">policy engine</span><span class="tag t-guard">OPA</span></div><p class="card-desc">Escalate on auth/payments/PII/migrations/deps.</p></div>
+          <div class="card guard"><div class="card-top"><span class="card-name">spec conformance</span><span class="tag t-guard">Verifier</span></div><p class="card-desc">Diff must meet acceptance criteria (+ oasdiff).</p></div>
+          <div class="card guard"><div class="card-top"><span class="card-name">canary + rollback</span><span class="tag t-guard">slot swap</span></div><p class="card-desc">Staging slot → metrics gate → swap, or swap-back.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flowline"><span class="bar"></span>via model gateway — <b style="color:var(--slate)">code + specs only, secrets scrubbed</b> <span class="dir">▼</span><span class="bar"></span></div>
+
+    <!-- ZONE 4 EXTERNAL -->
+    <div class="zone ext">
+      <div class="zone-head">
+        <p class="zone-name"><span class="zone-tag zt-ext">Zone 4</span> External · egress under DPA</p>
+        <p class="zone-note">no finance data · no-train / zero-retention terms</p>
+      </div>
+      <div class="cards">
+        <div class="card">
+          <div class="card-top"><span class="card-name">Anthropic / OpenAI</span><span class="tag t-ext">Frontier API</span></div>
+          <p class="card-desc">Model inference for all agent stages. Swappable to Azure-OpenAI-India / sovereign later.</p>
+        </div>
+        <div class="card">
+          <div class="card-top"><span class="card-name">JIRA</span><span class="tag t-ext">SaaS</span></div>
+          <p class="card-desc">Ticketing — trigger source + escalation target.</p>
+        </div>
+        <div class="card">
+          <div class="card-top"><span class="card-name">Atlas control plane</span><span class="tag t-ext">SaaS</span></div>
+          <p class="card-desc">Managed-DB orchestration (data stays in India region).</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="gap">
+    <div class="item"><b>⚠ Gap · no DR</b><p>Single-region South India, DB backups only. Fine for the Phase-0 pilot; revisit before agents own production-critical modules.</p></div>
+    <div class="item"><b>⚠ Hardening · single subscription</b><p>Acceptable on credits; split the agentic planes into a dedicated subscription later for hard blast-radius + billing isolation.</p></div>
+    <div class="item"><b>◆ Dependency · flag API</b><p>The homegrown flag service must expose a programmatic API (create flag, target, kill) for autonomous deploy.</p></div>
+  </div>
+
+  <p class="foot">
+    Flow: JIRA trigger → Orchestrator → ephemeral worker (code-graph + Coder, models via gateway) → guardrail gates in Pipelines → staging slot → canary → slot-swap to prod → Monitor → loop. Audit ledger written throughout.
+  </p>
+
+</div>
+</body>
+</html>

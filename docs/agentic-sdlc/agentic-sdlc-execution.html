@@ -1,0 +1,250 @@
+<title>Agentic SDLC — End-to-End Execution View</title>
+<style>
+  :root{
+    --ground:#eef2f8; --panel:#ffffff; --panel2:#f5f8fc; --line:#dbe3ee;
+    --ink:#1a2740; --muted:#556682; --faint:#8695ab;
+    --teal:#0d9488; --teal-b:#5eead4; --teal-bg:#e3fbf6;
+    --azure:#0369a1; --adopt:#15803d; --build:#b45309; --guard:#dc2626; --ext:#6d28d9;
+    --spine:#cdd8e7;
+  }
+  *{box-sizing:border-box}
+  .wrap{
+    background:
+      radial-gradient(1100px 560px at 82% -12%, #dceafc 0%, transparent 62%),
+      var(--ground);
+    color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5; padding:40px 20px 60px; min-height:100%;
+  }
+  .inner{max-width:920px;margin:0 auto}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  code.mono{background:#eef2f8;border:1px solid var(--line);border-radius:5px;padding:.5px 5px;font-size:.92em;color:var(--ink)}
+  header.head{margin-bottom:26px}
+  .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--teal);font-weight:700}
+  h1{font-size:clamp(24px,4vw,34px);margin:.25em 0 .1em;letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--muted);font-size:15px;max-width:60ch}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:18px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 1px 2px rgba(26,39,64,.04)}
+  .lg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .dot{width:10px;height:10px;border-radius:3px;flex:none}
+  .d-azure{background:var(--azure)} .d-adopt{background:var(--adopt)} .d-build{background:var(--build)} .d-guard{background:var(--guard)} .d-ext{background:var(--ext)}
+
+  /* phase band */
+  .band{border:1px solid var(--line);border-radius:14px;padding:6px 0;margin:16px 0;background:var(--panel);box-shadow:0 1px 3px rgba(26,39,64,.05)}
+  .band-label{display:flex;align-items:center;gap:10px;padding:12px 18px 4px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .band-label .tag{margin-left:auto;font-size:11px;letter-spacing:.04em;text-transform:none;color:var(--teal);border:1px solid var(--teal-b);background:var(--teal-bg);padding:2px 9px;border-radius:20px;font-weight:600}
+  .band.ephemeral{border-style:dashed;border-color:#9cc0e6;background:#fbfdff}
+  .band.prod{border-color:#bfe0cb;background:#f4fbf6}
+  .band.define{border-color:#d3c4f0;background:#faf8fe}
+  .band.define .num{background:#f2ecfc;color:var(--ext);border-color:#cbbcf0}
+  .band.define .band-label .tag{color:var(--ext);border-color:#cbbcf0;background:#f4effd}
+  .phase-div{display:flex;align-items:center;gap:12px;margin:22px 2px 2px;color:var(--faint);font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700}
+  .phase-div::before,.phase-div::after{content:"";height:1px;background:var(--line);flex:1}
+
+  /* steps */
+  .steps{padding:6px 16px 14px}
+  .step{position:relative;display:grid;grid-template-columns:34px 1fr;gap:14px;padding:12px 0}
+  .step:not(:last-child)::before{content:"";position:absolute;left:16px;top:34px;bottom:-12px;width:2px;background:var(--spine)}
+  .num{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:700;font-size:14px;
+       background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-b);position:relative;z-index:1}
+  .step h3{margin:5px 0 4px;font-size:16px;letter-spacing:-.01em}
+  .step p{margin:0 0 9px;color:var(--muted);font-size:13.5px}
+  .zone{float:right;font-size:11px;color:var(--faint);border:1px solid var(--line);border-radius:6px;padding:1px 7px;margin-left:8px;background:var(--panel2)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:11.5px;padding:3px 9px;border-radius:6px;border:1px solid;background:var(--panel);font-weight:500}
+  .c-azure{color:var(--azure);border-color:#b6d7ea;background:#eff8fd}
+  .c-adopt{color:var(--adopt);border-color:#bbe3c6;background:#f0faf3}
+  .c-build{color:var(--build);border-color:#e6d3a6;background:#fdf6e9}
+  .c-guard{color:var(--guard);border-color:#f0c0c0;background:#fdf1f1}
+  .c-ext{color:var(--ext);border-color:#d3c4f0;background:#f6f1fd}
+
+  /* decision */
+  .decision{border:1px solid #e6d3a6;background:#fdf9ef;border-radius:14px;padding:16px 18px;margin:16px 0;box-shadow:0 1px 3px rgba(26,39,64,.05)}
+  .decision .dh{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+  .decision .dh .n{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:#fbeecb;color:var(--build);border:1px solid #e6d3a6;font-size:13px}
+  .branches{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+  .branch{border:1px solid var(--line);border-radius:10px;padding:12px 13px;background:var(--panel)}
+  .branch.auto{border-color:#bbe3c6;background:#f4fbf6}
+  .branch.human{border-color:#b6d7ea;background:#f3faff}
+  .branch .bt{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:4px}
+  .branch.auto .bt{color:var(--adopt)} .branch.human .bt{color:var(--azure)}
+  .branch p{margin:0;font-size:12.5px;color:var(--muted)}
+  .branch .cond{display:block;font-size:11.5px;color:var(--faint);margin-top:7px}
+
+  /* invariants */
+  .inv{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:26px}
+  .inv .card{border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:10px;padding:13px 14px;background:var(--panel);box-shadow:0 1px 2px rgba(26,39,64,.04)}
+  .inv .card b{display:block;font-size:13px;margin-bottom:3px}
+  .inv .card span{font-size:12px;color:var(--muted)}
+  .foot{margin-top:22px;color:var(--faint);font-size:12px;text-align:center}
+  @media(max-width:640px){.branches,.inv{grid-template-columns:1fr}.step p .zone{float:none;display:inline-block;margin:4px 0 0}}
+</style>
+
+<div class="wrap"><div class="inner">
+  <header class="head">
+    <div class="eyebrow">Agentic SDLC · Runtime Trace</div>
+    <h1>End-to-End Execution View</h1>
+    <p class="sub">One unit of work across <strong>two phases</strong> — <em>A · Define</em> (problem → product spec → system design, human-ratified) then <em>B · Build &amp; Ship</em> (spec+design → code → prod, autonomous &amp; gated). Real technology at each hop. Structure lives in the logical &amp; physical diagrams; this is the <em>motion</em>.</p>
+    <div class="legend">
+      <span class="lg"><span class="dot d-azure"></span>Azure infra</span>
+      <span class="lg"><span class="dot d-adopt"></span>Adopted OSS</span>
+      <span class="lg"><span class="dot d-build"></span>Bespoke build</span>
+      <span class="lg"><span class="dot d-guard"></span>Guardrail / gate</span>
+      <span class="lg"><span class="dot d-ext"></span>External seam</span>
+    </div>
+  </header>
+
+  <div class="phase-div">Phase A · Define — spec &amp; design generation (human-ratified)</div>
+
+  <!-- PHASE A: DEFINE -->
+  <div class="band define">
+    <div class="band-label">Define <span class="tag">JIRA · human-in-the-loop · low autonomy</span></div>
+    <div class="steps">
+      <div class="step">
+        <div class="num">A1</div>
+        <div>
+          <h3>Problem &amp; framing — PM Agent <span class="zone">JIRA Epic</span></h3>
+          <p>A <strong>JIRA Epic/Feature</strong>, raw ask, or <strong>Bug</strong> — often <em>just a problem</em> (`09`). PM Agent frames it, grounds it in evidence (<em>cite or it’s a hypothesis</em>), proposes priority + a success metric. <strong>You ratify INTENT</strong> → epic-spec.</p>
+          <div class="chips"><span class="chip c-ext">JIRA Epic/Feature</span><span class="chip c-build">PM Agent</span><span class="chip c-guard">Human ratifies intent</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">A2</div>
+        <div>
+          <h3>Product-spec generation &amp; validation — Spec Agent <span class="zone">JIRA Story</span></h3>
+          <p>Grounds vs KB → clarifies ambiguity on the JIRA Story/Task → drafts (every claim cited) → decomposes to unit-specs with <strong>Gherkin</strong> criteria → the <strong>9-gate gauntlet</strong> → <strong>you ratify</strong>. Output: an <strong>ACTIVE unit-spec</strong> — the contract.</p>
+          <div class="chips"><span class="chip c-build">Spec Agent</span><span class="chip c-adopt">Serena + Atlas KB</span><span class="chip c-guard">OPA · oasdiff · Pact</span><span class="chip c-guard">Human ratifies spec</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">A3</div>
+        <div>
+          <h3>System-design generation — Plan/Design Agent <span class="zone">Zone 3</span></h3>
+          <p>Turns the spec (WHAT) into the <strong>HOW</strong>: components, data-model changes, integration contracts at the seams, migration + test strategy — <strong>grounded &amp; cited vs the KB</strong>. <strong>Optional DESIGN REVIEW</strong> (human sign-off) for new-system / high-risk / auth-payments-PII work.</p>
+          <div class="chips"><span class="chip c-build">Plan/Design Agent</span><span class="chip c-adopt">Serena + Atlas KB</span><span class="chip c-guard">Optional design review</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase-div">Phase B · Build &amp; Ship — spec+design → production (autonomous · gated)</div>
+
+  <!-- PHASE B: TRIGGER -->
+  <div class="band">
+    <div class="band-label">Trigger <span class="tag">ratified spec + design → build run</span></div>
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <div>
+          <h3>Trigger <span class="zone">Zone 2</span></h3>
+          <p>Issue moved to <strong>“Ready for Agent”</strong> → JIRA webhook → bridge ingress. Orchestrator admits the run (spec exists? blast-radius OK?), writes <em>run-start</em> to the ledger, enqueues the job.</p>
+          <div class="chips"><span class="chip c-ext">JIRA webhook</span><span class="chip c-build">Orchestrator</span><span class="chip c-azure">Service Bus</span><span class="chip c-guard">OPA policy</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EPHEMERAL WORKER -->
+  <div class="band ephemeral">
+    <div class="band-label">Ephemeral Worker <span class="tag">Azure Container Instance · spawned per run → destroyed after</span></div>
+    <div class="steps">
+      <div class="step">
+        <div class="num">2</div>
+        <div>
+          <h3>Spawn — container, not VM <span class="zone">Zone 3</span></h3>
+          <p>Fresh <strong>ACI</strong> sandbox with a short-lived, least-privilege managed identity. Can reach only the Model Gateway, the KB, and the repo seam — <em>never</em> the app data cluster.</p>
+          <div class="chips"><span class="chip c-azure">Azure Container Instances</span><span class="chip c-azure">Managed Identity</span><span class="chip c-azure">Key Vault (own)</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <div>
+          <h3>Checkout — the repo seam <span class="zone">seam</span></h3>
+          <p><code class="mono">git checkout</code> a clean working copy from Azure DevOps Repos. The <em>live checkout</em> is why the Coder can’t hallucinate current code — it reads reality.</p>
+          <div class="chips"><span class="chip c-ext">Azure DevOps Repos</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">4</div>
+        <div>
+          <h3>Coder — generate the change <span class="zone">Zone 3</span></h3>
+          <p>Loads spec + KB (structure-scoped retrieval) + episodic lessons. Writes <strong>code &amp; tests</strong>. Every model call routes the Gateway — <em>only code + spec leave the tenant, never regulated data.</em></p>
+          <div class="chips"><span class="chip c-adopt">OpenHands / Cline</span><span class="chip c-adopt">Serena</span><span class="chip c-adopt">Atlas Vector</span><span class="chip c-build">Model Gateway</span><span class="chip c-ext">Claude / GPT</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">5</div>
+        <div>
+          <h3>Sandbox testing — verify by execution <span class="zone">Zone 3</span></h3>
+          <p>In the same throwaway sandbox: acceptance tests (from Gherkin), the regression suite, types/lint, and Pact + oasdiff for integration work. Ephemeral test DB / fixtures — <em>never</em> prod data.</p>
+          <div class="chips"><span class="chip c-adopt">Test runners</span><span class="chip c-adopt">Pact</span><span class="chip c-adopt">oasdiff</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">6</div>
+        <div>
+          <h3>Gates — the validation gauntlet <span class="zone">Zone 3</span></h3>
+          <p>Spec-conformance · blast-radius · OPA/Rego policy · adversarial Verifier · breaking-change. Every result → audit ledger. Fail → bounded retry or escalate.</p>
+          <div class="chips"><span class="chip c-guard">Spec-conformance</span><span class="chip c-guard">Blast-radius</span><span class="chip c-guard">OPA/Rego</span><span class="chip c-guard">Adversarial Verifier</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">7</div>
+        <div>
+          <h3>Commit — open the PR <span class="zone">seam</span></h3>
+          <p>Push a branch and open a <strong>Pull Request</strong> carrying the evidence pack (spec link, gate results, diff, blast-radius). <strong>Azure Pipelines CI</strong> re-verifies on neutral infra — belt and suspenders.</p>
+          <div class="chips"><span class="chip c-ext">Azure DevOps Repos (PR)</span><span class="chip c-azure">Azure Pipelines</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTIONAL REVIEW -->
+  <div class="decision">
+    <div class="dh"><span class="n">8</span> Optional human review &amp; approval</div>
+    <div class="branches">
+      <div class="branch auto">
+        <div class="bt">Auto-merge</div>
+        <p>All gates + CI green, high confidence, proven low-risk module. No human in the path.</p>
+        <span class="cond">L3 · low-risk · human on the loop (notified + kill switch)</span>
+      </div>
+      <div class="branch human">
+        <div class="bt">Human approves</div>
+        <p>Reviewer inspects the diff + evidence pack in ADO / JIRA, then approves or requests changes.</p>
+        <span class="cond">L2 · or auth/payments/PII · or low confidence · or a gate flagged</span>
+      </div>
+    </div>
+    <p style="margin:13px 0 0;font-size:12.5px;color:var(--faint)">Optional by design — the gates &amp; evals make review skippable for proven classes, so the human is the <em>exception path, not the default bottleneck.</em></p>
+  </div>
+
+  <!-- PRODUCTION -->
+  <div class="band prod">
+    <div class="band-label">Production &amp; Close-the-loop <span class="tag">dark · canaried · reversible</span></div>
+    <div class="steps">
+      <div class="step">
+        <div class="num">9</div>
+        <div>
+          <h3>Deploy — staging slot, dark, canaried <span class="zone">Zone 1</span></h3>
+          <p>Merge → Pipelines builds → <strong>App Service staging slot</strong>. Ships <strong>dark</strong> behind a feature flag → canary ramp → <strong>auto-rollback / kill-switch</strong> on any regression breach.</p>
+          <div class="chips"><span class="chip c-azure">App Service slots</span><span class="chip c-build">Feature flags (homegrown)</span><span class="chip c-guard">Canary + rollback</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">10</div>
+        <div>
+          <h3>Monitor &amp; close the loops <span class="zone">Zone 1 → 2</span></h3>
+          <p>Monitor reads telemetry via the <strong>read-only seam</strong> → ramps or holds. Then: <strong>KB re-sync</strong> (= done), Drift re-check, episodic lesson written, ledger sealed, PM↔outcome fed back — and the <strong>worker is destroyed</strong>.</p>
+          <div class="chips"><span class="chip c-ext">PostHog / metrics</span><span class="chip c-build">KB sync</span><span class="chip c-build">Drift Reconciler</span><span class="chip c-build">Episodic memory</span><span class="chip c-build">Audit ledger</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INVARIANTS -->
+  <div class="inv">
+    <div class="card"><b>Isolation</b><span>The worker touches the app only through seams — repo in, deploy out, read-only telemetry in. No shared datastore, ever.</span></div>
+    <div class="card"><b>No regulated data to models</b><span>Only code + spec cross the Model Gateway. Customer / financial data never enters a model context.</span></div>
+    <div class="card"><b>Every hop audited</b><span>Trigger, spawn, model call, gate, merge, deploy, rollback — all land in the immutable ledger.</span></div>
+  </div>
+
+  <p class="foot">Agentic SDLC · doc 11 — Execution View · code + specs only, never finance data</p>
+</div></div>

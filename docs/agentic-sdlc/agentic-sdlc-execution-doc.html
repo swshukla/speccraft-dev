@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic SDLC — End-to-End Execution View</title>
+<style>
+  :root{
+    --ground:#f3f6fa; --panel:#ffffff; --panel2:#f5f8fc; --line:#dde5ef;
+    --ink:#182338; --ink2:#28374f; --muted:#54657f; --faint:#8494a9;
+    --teal:#0d9488; --teal-b:#8fe4d7; --teal-bg:#e6faf5;
+    --azure:#0369a1; --adopt:#15803d; --build:#b45309; --guard:#dc2626; --ext:#6d28d9;
+    --spine:#d3dded;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.62; font-size:16px;
+  }
+  .doc{max-width:820px;margin:0 auto;padding:48px 22px 72px}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  code{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;background:#eef2f8;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:.88em;color:var(--ink2)}
+
+  header.head{border-bottom:1px solid var(--line);padding-bottom:22px;margin-bottom:8px}
+  .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--teal);font-weight:700}
+  h1{font-size:clamp(26px,4.4vw,36px);line-height:1.15;margin:.3em 0 .35em;letter-spacing:-.015em;text-wrap:balance}
+  .meta{color:var(--muted);font-size:14.5px;max-width:64ch}
+  .meta b{color:var(--ink2)}
+
+  h2{font-size:20px;letter-spacing:-.01em;margin:42px 0 6px;padding-top:20px;border-top:1px solid var(--line)}
+  h2:first-of-type{border-top:none}
+  .lead{color:var(--muted);font-size:14.5px;margin:.2em 0 1.1em}
+
+  /* ascii flow */
+  pre.flow{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:10px;
+    padding:16px;overflow-x:auto;font-size:12px;line-height:1.5;color:var(--ink2);box-shadow:0 1px 2px rgba(24,35,56,.04)}
+
+  /* steps */
+  .step{position:relative;display:grid;grid-template-columns:38px 1fr;gap:16px;padding:16px 0}
+  .step:not(:last-of-type)::before{content:"";position:absolute;left:18px;top:40px;bottom:-16px;width:2px;background:var(--spine)}
+  .num{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:15px;
+       background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-b);position:relative;z-index:1}
+  .step h3{margin:6px 0 4px;font-size:17px;letter-spacing:-.01em}
+  .step h3 .zone{float:right;font-size:11px;font-weight:600;color:var(--faint);border:1px solid var(--line);border-radius:6px;padding:2px 8px;margin-left:8px;background:var(--panel2)}
+  .step p{margin:0 0 10px;color:var(--ink2);font-size:14.5px}
+  .step p.alt{color:var(--muted);font-size:13.5px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:11.5px;padding:3px 9px;border-radius:6px;border:1px solid;font-weight:500}
+  .c-azure{color:var(--azure);border-color:#b6d7ea;background:#eff8fd}
+  .c-adopt{color:var(--adopt);border-color:#bbe3c6;background:#f0faf3}
+  .c-build{color:var(--build);border-color:#e6d3a6;background:#fdf6e9}
+  .c-guard{color:var(--guard);border-color:#f0c0c0;background:#fdf1f1}
+  .c-ext{color:var(--ext);border-color:#d3c4f0;background:#f6f1fd}
+
+  /* review callout */
+  .review{border:1px solid #e6d3a6;background:#fdf9ef;border-radius:12px;padding:18px 20px;margin:14px 0 4px}
+  .review table{margin:8px 0 0}
+  .review .tag{display:inline-block;font-weight:700;font-size:12px;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:6px}
+  .tag.auto{color:var(--adopt);background:#eafaef;border:1px solid #bbe3c6}
+  .tag.human{color:var(--azure);background:#eef7fd;border:1px solid #b6d7ea}
+  .note{color:var(--muted);font-size:13px;margin-top:12px}
+
+  /* tables */
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--panel2);font-size:12px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  tr:last-child td{border-bottom:none}
+  td b{color:var(--ink2)}
+  .zc{white-space:nowrap;color:var(--faint);font-size:12px}
+
+  /* invariants */
+  .inv{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0 0}
+  .inv .card{border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:10px;padding:14px 15px;background:var(--panel);box-shadow:0 1px 2px rgba(24,35,56,.04)}
+  .inv .card b{display:block;font-size:13.5px;margin-bottom:4px}
+  .inv .card span{font-size:12.5px;color:var(--muted)}
+
+  .foot{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
+  @media(max-width:640px){.inv{grid-template-columns:1fr}.step h3 .zone{float:none;display:inline-block;margin:4px 0 0}}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <header class="head">
+    <div class="eyebrow">Agentic SDLC · Runtime Trace</div>
+    <h1>End-to-End Execution View</h1>
+    <p class="meta"><b>Purpose.</b> One unit of work traced through the whole machine — source → trigger → spawn → code → sandbox test → gates → PR → <em>optional</em> human review → production → monitor → teardown — naming the real technology and integration at each hop. This is the <em>motion</em> view (the logical diagram shows structure; the physical diagram shows deployment).</p>
+  </header>
+
+  <h2>The flow at a glance</h2>
+  <pre class="flow"> SOURCE            TRIGGER              CONTROL PLANE (Zone 2, always-on)         EPHEMERAL WORKER (Zone 3, per-run)
+ ───────           ───────              ─────────────────────────────────        ──────────────────────────────────
+ Ratified spec  ─► JIRA webhook   ─►  Bridge ingress ─► Orchestrator      ─►    ACI container spawned (fresh, scoped MI)
+ (JIRA)          ("Ready for          (Container App,     │ enqueue             │ git checkout (repo seam, ADO)
+                   Agent")              Agent SDK,          ▼ Service Bus          │ load spec + KB + episodic memory
+                                        state machine)   ┌──────────┐             │ Coder (OpenHands/Cline)
+                                            │            │ Model    │◄────────────┤   ▲ every model call
+                                            │            │ Gateway  │─► foundation │   │ (redact, budget, audit)
+                                            │            └──────────┘   model      │ writes code + tests
+                                            │                                      │ RUN TESTS IN-SANDBOX ◄── testing here
+                                            │  gates + audit ◄─────────────────────┤   (acceptance/Gherkin, regression,
+                                            ▼                                      │    types, Pact, oasdiff)
+                                     ┌─────────────┐                               └─► push branch + open PR (ADO Repos)
+                                     │ audit ledger│                                        │
+                                     │ (dedicated  │                                        ▼
+                                     │  cluster)   │                              Azure Pipelines CI (authoritative re-verify)
+                                     └─────────────┘                                        │
+                                                                                            ▼
+                                                          ┌───────────── OPTIONAL HUMAN REVIEW ─────────────┐
+                                                          │  L3 low-risk + all gates green → AUTO-MERGE      │
+                                                          │  L2 / high-risk / low-confidence → HUMAN APPROVES│
+                                                          └──────────────────────┬──────────────────────────┘
+                                                                                 ▼
+                                              merge → Pipelines release → App Service STAGING SLOT
+                                                       → feature flag OFF (dark) → canary → flag ramp
+                                                       → Monitor (read-only telemetry seam) → auto-rollback / kill-switch
+                                                       → KB re-sync + Drift check + episodic lesson → WORKER DESTROYED</pre>
+
+  <h2>Step by step</h2>
+
+  <div class="step">
+    <div class="num">0</div>
+    <div>
+      <h3>Source — where a unit of work is born <span class="zone">JIRA</span></h3>
+      <p>A ratified, <b>ACTIVE spec</b> in JIRA (produced by the PM → Spec chain), decomposed into a build-ready unit-spec with Gherkin acceptance criteria.</p>
+      <p class="alt"><em>Alternate sources:</em> a Drift Reconciler finding (code ≠ spec), or a Monitor incident — both enter the same pipeline.</p>
+      <div class="chips"><span class="chip c-ext">JIRA</span><span class="chip c-build">Spec-as-code</span></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">1</div>
+    <div>
+      <h3>Trigger — what starts a run <span class="zone">Zone 2</span></h3>
+      <p>A human (or the system) moves the JIRA issue to <b>“Ready for Agent.”</b> A JIRA webhook hits the JIRA⇄Azure DevOps bridge ingress. The Orchestrator admits the run — checks a ratified spec exists and blast-radius is within policy (OPA/Rego) — writes <code>run-start</code> to the audit ledger, and enqueues a job on Azure Service Bus.</p>
+      <div class="chips"><span class="chip c-ext">JIRA webhook</span><span class="chip c-build">Orchestrator</span><span class="chip c-azure">Service Bus</span><span class="chip c-guard">OPA policy</span></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">2</div>
+    <div>
+      <h3>Spawn the worker — container, not VM <span class="zone">Zone 3</span></h3>
+      <p>The Orchestrator requests a <b>fresh, ephemeral sandbox per run</b>: an <b>Azure Container Instance</b> (or Container Apps Job), spawned on demand and torn down after. Containers, not VMs — faster spawn, cheaper, sufficient isolation when properly sandboxed. The worker gets a short-lived, least-privilege managed identity (secrets from the agentic plane’s <b>own</b> Key Vault) and can reach only the Model Gateway, the dedicated agentic cluster, and the repo seam — <em>never</em> the application data cluster.</p>
+      <div class="chips"><span class="chip c-azure">Azure Container Instances</span><span class="chip c-azure">Managed Identity</span><span class="chip c-azure">Key Vault (own)</span></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">3</div>
+    <div>
+      <h3>Check out the code — the repo seam <span class="zone">seam</span></h3>
+      <p>The worker runs <code>git checkout</code> of the target branch from Azure DevOps Repos into the sandbox — a clean, isolated working copy. This <em>live checkout</em> is why the Coder can’t hallucinate current code: it reads reality, not memory. Code flows <b>in across a seam</b>; nothing is shared.</p>
+      <div class="chips"><span class="chip c-ext">Azure DevOps Repos</span></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">4</div>
+    <div>
+      <h3>Coder — generate the change <span class="zone">Zone 3</span></h3>
+      <p>The worker loads context: the ACTIVE spec (Gherkin criteria), the KB via structure-scoped retrieval (Serena graph + Atlas Vector), and episodic memory (check-before-act lessons). OpenHands / Cline drives the edit loop, writing <b>code + tests</b>. Every model call routes through the Model Gateway — redaction, token budget, audit. Only <b>code + spec</b> ever leave the tenant; <em>no regulated data, ever.</em></p>
+      <div class="chips"><span class="chip c-adopt">OpenHands / Cline</span><span class="chip c-adopt">Serena</span><span class="chip c-adopt">Atlas Vector</span><span class="chip c-build">Model Gateway</span><span class="chip c-ext">Claude / GPT</span></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">5</div>
+    <div>
+      <h3>Sandbox testing — where verification runs <span class="zone">Zone 3</span></h3>
+      <p>In the same ephemeral sandbox, the worker executes the generated acceptance tests (from Gherkin), the existing regression suite, type-checks and linters, and — for integration work — Pact contract tests at the seams plus oasdiff on the API surface. Any datastore needed is an <b>ephemeral test DB / fixtures</b>, never production data. This is “verify by execution, not opinion” — running code is the truth signal.</p>
+      <div class="chips"><span class="chip c-adopt">Test runners</span><span class="chip c-adopt">Pact</span><span class="chip c-adopt">oasdiff</span></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">6</div>
+    <div>
+      <h3>Gates — the validation gauntlet <span class="zone">Zone 3</span></h3>
+      <p>Spec-conformance (do acceptance tests pass?), blast-radius + OPA/Rego policy (auth/payments/PII → stricter path), an adversarial Verifier/Critic (independent agent tries to refute), a breaking-change check (oasdiff), and regression green. Every result lands in the audit ledger. A failed gate triggers a bounded retry (back to the Coder) or an escalation to a human.</p>
+      <div class="chips"><span class="chip c-guard">Spec-conformance</span><span class="chip c-guard">Blast-radius</span><span class="chip c-guard">OPA/Rego</span><span class="chip c-guard">Adversarial Verifier</span></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">7</div>
+    <div>
+      <h3>Commit — how code moves toward prod <span class="zone">seam</span></h3>
+      <p>The worker pushes a branch and opens a <b>Pull Request</b> in Azure DevOps Repos, linked to the JIRA issue, carrying the full evidence pack (spec link, gate results, diff, blast-radius, eval evidence). <b>Azure Pipelines CI</b> runs on the PR — the authoritative re-verification on neutral infra, independent of the sandbox. Belt and suspenders.</p>
+      <div class="chips"><span class="chip c-ext">Azure DevOps Repos (PR)</span><span class="chip c-azure">Azure Pipelines</span></div>
+    </div>
+  </div>
+
+  <div class="review">
+    <h3 style="margin:0 0 6px;font-size:17px">8 · Optional human review &amp; approval</h3>
+    <p style="margin:0 0 4px;color:var(--ink2);font-size:14px">Driven by the autonomy ladder and the risk/confidence of the change:</p>
+    <div class="tbl">
+      <table>
+        <tr><th>Condition</th><th>Path</th></tr>
+        <tr>
+          <td><b>L3</b> · low-risk module · all gates + CI green · high confidence</td>
+          <td><span class="tag auto">Auto-merge</span> &nbsp;No human in the path.</td>
+        </tr>
+        <tr>
+          <td><b>L2</b> · or high-risk (auth/payments/PII) · or low confidence · or a gate flagged</td>
+          <td><span class="tag human">Human approves</span> &nbsp;Reviewer inspects diff + evidence pack in ADO / JIRA, then approves or requests changes.</td>
+        </tr>
+      </table>
+    </div>
+    <p class="note">Optional <em>by design</em>: the gates &amp; evals make review safe to skip for proven low-risk classes, so the human is the <b>exception path, not the default bottleneck</b>. Even on auto-merge, a human is <b>on the loop</b> — notified, with a kill switch.</p>
+  </div>
+
+  <div class="step">
+    <div class="num">9</div>
+    <div>
+      <h3>Deploy to production — dark, canaried, reversible <span class="zone">Zone 1</span></h3>
+      <p>On approval/auto-approve, the PR merges to main; Azure Pipelines builds the artifact and deploys to the <b>App Service staging slot</b> first. It ships <b>dark</b> — live but with the homegrown feature flag OFF. A <b>canary</b> ramps (slot-swap / gradual flag %) watched by the Deployer + Monitor. On any error/regression breach, <b>auto-rollback / kill-switch</b> reverts instantly (flag-off or slot-swap-back).</p>
+      <div class="chips"><span class="chip c-azure">App Service slots</span><span class="chip c-build">Feature flags (homegrown)</span><span class="chip c-guard">Canary + rollback</span></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">10</div>
+    <div>
+      <h3>Close the loops &amp; tear down <span class="zone">Zone 1 → 2</span></h3>
+      <p>Monitor confirms health (via the read-only telemetry seam) → ramps the flag to 100% or holds. Then: <b>KB re-sync</b> (Serena + Atlas re-index = definition of done), <b>Drift Reconciler</b> re-checks spec↔code coherence, <b>episodic memory</b> records the outcome as a lesson, the <b>audit ledger</b> seals the run trace, and the <b>PM↔outcome loop</b> asks whether the success metric moved. The ephemeral worker is <b>destroyed</b> — zero persistent state.</p>
+      <div class="chips"><span class="chip c-ext">PostHog / metrics</span><span class="chip c-build">KB sync</span><span class="chip c-build">Drift Reconciler</span><span class="chip c-build">Episodic memory</span><span class="chip c-build">Audit ledger</span></div>
+    </div>
+  </div>
+
+  <h2>Technology &amp; integration map</h2>
+  <div class="tbl">
+    <table>
+      <tr><th>Concern</th><th>Technology</th><th>Zone</th></tr>
+      <tr><td>Trigger / tickets / human surface</td><td><b>JIRA</b> (webhooks + API)</td><td class="zc">External seam</td></tr>
+      <tr><td>Orchestration / state machine</td><td><b>Azure Container Apps</b> + Agent SDK</td><td class="zc">2 (always-on)</td></tr>
+      <tr><td>Job queue / events</td><td><b>Azure Service Bus</b></td><td class="zc">2</td></tr>
+      <tr><td>Ephemeral worker sandbox</td><td><b>Azure Container Instances</b> (or Container Apps Jobs; in-tenant microVM option)</td><td class="zc">3 (per-run)</td></tr>
+      <tr><td>Identity / secrets</td><td><b>Managed Identity + own Key Vault</b></td><td class="zc">2 / 3</td></tr>
+      <tr><td>Source control / PR</td><td><b>Azure DevOps Repos</b> (repo seam)</td><td class="zc">External seam</td></tr>
+      <tr><td>CI/CD</td><td><b>Azure Pipelines</b></td><td class="zc">2 → 1</td></tr>
+      <tr><td>Coder</td><td><b>OpenHands / Cline</b></td><td class="zc">3</td></tr>
+      <tr><td>Model access</td><td><b>Model Gateway</b> → Claude/GPT (sovereign later)</td><td class="zc">2 → ext (code+spec only)</td></tr>
+      <tr><td>Code graph / KB</td><td><b>Serena</b> + <b>Atlas Vector Search</b> (dedicated cluster)</td><td class="zc">2</td></tr>
+      <tr><td>Policy / gates</td><td><b>OPA/Rego</b>, <b>oasdiff</b>, <b>Pact</b></td><td class="zc">2 / 3</td></tr>
+      <tr><td>Deploy target</td><td><b>Azure App Service</b> (staging + prod slots)</td><td class="zc">1</td></tr>
+      <tr><td>Dark launch / rollback</td><td><b>Homegrown feature flags</b> (programmatic API)</td><td class="zc">1</td></tr>
+      <tr><td>Telemetry (read-only seam)</td><td><b>PostHog / metrics</b></td><td class="zc">1 → 2</td></tr>
+      <tr><td>Audit / memory / specs</td><td><b>Dedicated agentic Atlas/Mongo cluster</b></td><td class="zc">2</td></tr>
+    </table>
+  </div>
+
+  <h2>The three invariants this trace never violates</h2>
+  <div class="inv">
+    <div class="card"><b>Isolation</b><span>The worker touches the app only through seams — repo checkout in, deploy service-connection out, read-only telemetry in. No shared datastore, ever.</span></div>
+    <div class="card"><b>No regulated data to models</b><span>Only code + spec cross the Model Gateway. Customer / financial data never enters a model context.</span></div>
+    <div class="card"><b>Every hop is audited</b><span>Trigger, spawn, model call, gate, merge, deploy, rollback — all land in the immutable ledger.</span></div>
+  </div>
+
+  <p class="foot">Agentic SDLC · doc 11 — Execution View · 2026-07-11 · code + specs only, never finance data</p>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,88 @@
+#!/bin/bash
+# kb-forge session-kit installer — arms ONE CLONE of a repo that has a
+# superdev/ KB. Idempotent; warns instead of clobbering. Tracked artifacts
+# (skills, AGENTS.md section, commands) install once per repo and travel
+# with clones; hooks + settings.local.json must be re-run per clone/machine.
+#
+# Usage: install.sh [/path/to/repo]   (default: git toplevel of cwd)
+set -e
+REPO="${1:-$(git rev-parse --show-toplevel)}"
+KIT="$(cd "$(dirname "$0")" && pwd)"
+[ -f "$REPO/superdev/kbforge.yaml" ] || { echo "no superdev/kbforge.yaml in $REPO — run kbforge-init.sh first"; exit 1; }
+
+chmod +x "$KIT"/hooks/*.sh "$KIT/post-commit" "$KIT/pre-commit"
+
+# 1. AGENTS.md — shared cross-agent rules (Codex/OpenCode read it natively)
+if [ -f "$REPO/AGENTS.md" ] && grep -q "Knowledge Base (superdev/)" "$REPO/AGENTS.md"; then
+  echo "AGENTS.md: KB section already present"
+else
+  printf '\n' >> "$REPO/AGENTS.md" 2>/dev/null || true
+  cat "$KIT/AGENTS-section.md" >> "$REPO/AGENTS.md"
+  echo "AGENTS.md: KB section appended"
+fi
+
+# 2. CLAUDE.md — Claude Code does not read AGENTS.md natively; ensure import
+if [ -f "$REPO/CLAUDE.md" ]; then
+  grep -q "@AGENTS.md" "$REPO/CLAUDE.md" || { printf '@AGENTS.md\n' | cat - "$REPO/CLAUDE.md" > "$REPO/CLAUDE.md.tmp" && mv "$REPO/CLAUDE.md.tmp" "$REPO/CLAUDE.md"; }
+  echo "CLAUDE.md: @AGENTS.md import ensured"
+else
+  printf '@AGENTS.md\n' > "$REPO/CLAUDE.md"
+  echo "CLAUDE.md: created with @AGENTS.md import"
+fi
+
+# 3. Skills (tracked, per repo). One source, three registries:
+#    .claude/skills (Claude Code) + .agents/skills (Codex & OpenCode both
+#    read the Agent Skills standard natively) + .opencode/commands (explicit
+#    /superdev-* invocation in OpenCode).
+for s in superdev-interview superdev-recall superdev-decide superdev-diverge superdev-ratify; do
+  mkdir -p "$REPO/.claude/skills/$s" "$REPO/.agents/skills/$s"
+  cp "$KIT/skills/$s/SKILL.md" "$REPO/.claude/skills/$s/SKILL.md"
+  cp "$KIT/skills/$s/SKILL.md" "$REPO/.agents/skills/$s/SKILL.md"
+done
+mkdir -p "$REPO/.opencode/commands"
+cp "$KIT/opencode-commands/"superdev-*.md "$REPO/.opencode/commands/" 2>/dev/null || true
+echo "skills: installed to .claude/skills/ + .agents/skills/ (+ .opencode/commands)"
+
+# 3b. Codex explicit /superdev-* prompts (user-global, once per machine; Codex has
+#     no repo-level prompts — its native path is .agents/skills above)
+mkdir -p "$HOME/.codex/prompts"
+for p in "$KIT/codex-prompts/"superdev-*.md; do
+  [ -f "$HOME/.codex/prompts/$(basename "$p")" ] || cp "$p" "$HOME/.codex/prompts/"
+done
+echo "codex prompts: ensured in ~/.codex/prompts/"
+
+# 4. .claude/settings.local.json — hooks + per-machine settings (untracked)
+mkdir -p "$REPO/.claude"
+SL="$REPO/.claude/settings.local.json"
+if [ -f "$SL" ]; then
+  if jq -e '.hooks' "$SL" >/dev/null 2>&1; then
+    if grep -q "kb-briefing.sh" "$SL"; then
+      echo "settings.local.json: KB hooks already present"
+    else
+      echo "settings.local.json: existing hooks found — merge $KIT/settings.json by hand"
+    fi
+  else
+    jq -s '.[0] * .[1]' "$SL" "$KIT/settings.json" > "$SL.tmp" && mv "$SL.tmp" "$SL"
+    echo "settings.local.json: merged"
+  fi
+else
+  cp "$KIT/settings.json" "$SL"
+  echo "settings.local.json: installed"
+fi
+
+# 5. Git hooks (per clone — git does not version hooks)
+for h in post-commit pre-commit; do
+  DEST="$REPO/.git/hooks/$h"
+  if [ -f "$DEST" ] && ! grep -q "kb-forge" "$DEST"; then
+    echo "$h: EXISTS with other content — append $KIT/$h by hand"
+  else
+    cp "$KIT/$h" "$DEST" && chmod +x "$DEST"
+    echo "$h: installed"
+  fi
+done
+
+# 6. First status file
+"$KIT/hooks/kb-status.sh" 2>/dev/null || (cd "$REPO" && "$KIT/hooks/kb-status.sh") || true
+echo "KB-STATUS.md: generated"
+
+echo "Done. New agent sessions in $REPO see the KB; commits run the ship loop."

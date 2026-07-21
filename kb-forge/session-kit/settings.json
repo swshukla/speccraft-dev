@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/swapnil/superdev/kb-forge/session-kit/hooks/kb-briefing.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/swapnil/superdev/kb-forge/session-kit/hooks/kb-guard.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/swapnil/superdev/kb-forge/session-kit/hooks/kb-recall-post.sh",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}

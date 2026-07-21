@@ -1,0 +1,563 @@
+<style>
+  :root {
+    --ground: #F4F5F7;
+    --panel: #FBFBFC;
+    --ink: #141A24;
+    --slate: #55606F;
+    --slate-soft: #8A94A2;
+    --hair: #DDE1E7;
+    --hair-strong: #C7CDD6;
+
+    --teal: #0D7377;
+    --teal-soft: #E1EFEF;
+    --teal-line: #7FB4B5;
+
+    --adopt: #2F7D57;
+    --adopt-soft: #E4F0E9;
+    --adapt: #3A5285;
+    --adapt-soft: #E6EAF2;
+    --build: #B07807;
+    --build-soft: #F7EED7;
+    --guard: #A14A4A;
+    --guard-soft: #F3E4E4;
+
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 44px 28px 80px;
+  }
+
+  /* ---------- header ---------- */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin: 0 0 12px;
+  }
+  h1 {
+    font-size: clamp(28px, 4vw, 42px);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+    font-weight: 680;
+  }
+  .lede {
+    font-size: 17px;
+    color: var(--slate);
+    max-width: 64ch;
+    margin: 0;
+  }
+  .lede strong { color: var(--ink); font-weight: 620; }
+  .meta {
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--slate-soft);
+  }
+  .meta span { white-space: nowrap; }
+  .meta b { color: var(--slate); font-weight: 600; }
+
+  .rule { height: 1px; background: var(--hair); margin: 34px 0; border: 0; }
+
+  /* ---------- legend ---------- */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    margin: 0 0 30px;
+  }
+  .chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    padding: 4px 9px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .chip::before {
+    content: "";
+    width: 8px; height: 8px; border-radius: 2px;
+    background: currentColor;
+    opacity: 0.9;
+  }
+  .c-adopt { color: var(--adopt); background: var(--adopt-soft); border-color: #CBE1D5; }
+  .c-adapt { color: var(--adapt); background: var(--adapt-soft); border-color: #CFD8E8; }
+  .c-build { color: var(--build); background: var(--build-soft); border-color: #E8D6A6; }
+  .c-guard { color: var(--guard); background: var(--guard-soft); border-color: #E7C9C9; }
+
+  /* ---------- band scaffolding ---------- */
+  .board {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .band {
+    background: var(--panel);
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    padding: 18px 20px 20px;
+  }
+  .band-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 15px;
+  }
+  .band-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin: 0;
+  }
+  .band-note {
+    font-size: 12.5px;
+    color: var(--slate-soft);
+    margin: 0;
+    text-align: right;
+  }
+
+  /* node cards */
+  .row {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+  }
+  .row.scroll { overflow-x: auto; padding-bottom: 6px; }
+  .cards { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  .node {
+    flex: 1 1 0;
+    min-width: 150px;
+    background: #fff;
+    border: 1px solid var(--hair-strong);
+    border-radius: 9px;
+    padding: 13px 13px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .node.build { border-color: #E3C878; background: #FFFCF3; box-shadow: 0 0 0 1px #EAD79A inset; }
+  .node.guard { border-color: #DEBFBF; background: #FFF9F9; }
+
+  .node-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .node-name .star { color: var(--build); font-size: 12px; }
+  .node-desc { font-size: 12.5px; color: var(--slate); margin: 0; }
+  .node-tool {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--slate-soft);
+    margin-top: auto;
+    padding-top: 4px;
+  }
+  .tag {
+    align-self: flex-start;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .t-adopt { color: var(--adopt); background: var(--adopt-soft); }
+  .t-adapt { color: var(--adapt); background: var(--adapt-soft); }
+  .t-build { color: var(--build); background: var(--build-soft); }
+  .t-guard { color: var(--guard); background: var(--guard-soft); }
+
+  /* pipeline stage — narrower, sequential */
+  .stage {
+    flex: 0 0 auto;
+    width: 138px;
+    background: #fff;
+    border: 1px solid var(--hair-strong);
+    border-radius: 9px;
+    padding: 12px 12px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+  }
+  .stage .idx {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--teal);
+    letter-spacing: 0.1em;
+  }
+  .stage .nm { font-family: var(--mono); font-size: 13.5px; font-weight: 640; }
+  .stage .dsc { font-size: 11.5px; color: var(--slate); }
+  .stage .tl { font-family: var(--mono); font-size: 10px; color: var(--slate-soft); margin-top: auto; padding-top: 3px; }
+  .stage.verify { border-color: #DEBFBF; background: #FFF9F9; }
+
+  .arrow {
+    flex: 0 0 auto;
+    align-self: center;
+    color: var(--teal-line);
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 1px;
+  }
+
+  /* plane / trigger left-in, prod right-out */
+  .flow-in {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 16px;
+    align-items: stretch;
+  }
+  .side {
+    background: var(--panel);
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .side h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin: 0 0 3px;
+  }
+  .trig {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid var(--hair-strong);
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .trig em { font-style: normal; color: var(--slate-soft); font-size: 10.5px; }
+  .trig .now { color: var(--teal); }
+
+  /* knowledge base foundation */
+  .foundation {
+    background: linear-gradient(180deg, #fff, #FAFBFC);
+    border: 1px solid var(--hair);
+    border-top: 2px solid var(--teal-line);
+    border-radius: 12px;
+    padding: 18px 20px 20px;
+  }
+  .feeds {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--teal);
+    letter-spacing: 0.08em;
+    margin: 0 0 4px;
+  }
+
+  .plane-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--slate-soft);
+    border: 1px dashed var(--hair-strong);
+    border-radius: 4px;
+    padding: 2px 7px;
+  }
+
+  .foot {
+    margin-top: 30px;
+    font-size: 12.5px;
+    color: var(--slate-soft);
+    font-family: var(--mono);
+  }
+
+  @media (max-width: 720px) {
+    .flow-in { grid-template-columns: 1fr; }
+    .band-note { display: none; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .band, .foundation, .flow-in { animation: rise 0.5s ease both; }
+    .band:nth-child(2) { animation-delay: 0.05s; }
+    .band:nth-child(3) { animation-delay: 0.1s; }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  }
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">Agentic SDLC · System Architecture</p>
+  <h1>An autonomous software lifecycle that ships to production — with the guardrails to trust it.</h1>
+  <p class="lede">
+    Agents run the full loop — <strong>spec → plan → code → test → review → deploy → monitor</strong> —
+    on a contained module, shipping to prod with a human only on escalation. The intelligence is
+    <strong>rented</strong> from foundation models and mature OSS; the <strong>orchestration spine, the
+    guardrails, and the code↔spec reconciler</strong> are what we own.
+  </p>
+
+  <div class="meta">
+    <span><b>Stack</b> Node · Next.js · React Native · MongoDB · Azure</span>
+    <span><b>Models</b> Foundation now → sovereign-ready</span>
+    <span><b>Team</b> 5–20</span>
+    <span><b>Domain</b> Regulated fintech</span>
+  </div>
+
+  <hr class="rule" />
+
+  <div class="legend" aria-label="legend">
+    <span class="chip c-adopt">ADOPT — reuse OSS as-is</span>
+    <span class="chip c-adapt">ADAPT — wrap / configure</span>
+    <span class="chip c-build">BUILD — bespoke (our moat)</span>
+    <span class="chip c-guard">GUARDRAIL — safety gate</span>
+  </div>
+
+  <div class="board">
+
+    <!-- CONTROL PLANE + TRIGGERS -->
+    <div class="flow-in">
+      <div class="side">
+        <h4>Triggers →</h4>
+        <div class="trig"><span>Ticket / JIRA</span><em class="now">phase 0</em></div>
+        <div class="trig"><span>Telemetry alert</span><em>exception→fix</em></div>
+        <div class="trig"><span>Schedule / cron</span><em>grooming</em></div>
+        <div class="trig"><span>Loop feedback</span><em>rollback→ticket</em></div>
+      </div>
+
+      <div class="band" style="margin:0;">
+        <div class="band-head">
+          <p class="band-title">Control Plane · always-on orchestrator</p>
+          <span class="plane-tag">persistent · trusted · no code access</span>
+        </div>
+        <div class="cards">
+          <div class="node">
+            <span class="tag t-adapt">Adapt</span>
+            <span class="node-name">orchestrator</span>
+            <p class="node-desc">Event-driven state machine that advances stages and enforces gates.</p>
+            <span class="node-tool">Claude Agent SDK</span>
+          </div>
+          <div class="node">
+            <span class="tag t-adapt">Adapt</span>
+            <span class="node-name">state + queue</span>
+            <p class="node-desc">Pipeline state, event bus, escalation routing.</p>
+            <span class="node-tool">MongoDB · Service Bus</span>
+          </div>
+          <div class="node build">
+            <span class="tag t-build">Build</span>
+            <span class="node-name">audit ledger</span>
+            <p class="node-desc">Immutable log of every prompt, decision, diff & deploy — regulatory spine.</p>
+            <span class="node-tool">append-only</span>
+          </div>
+          <div class="node">
+            <span class="tag t-adopt">Adopt</span>
+            <span class="node-name">sandbox pool</span>
+            <p class="node-desc">Ephemeral least-privilege workers, one per stage-run.</p>
+            <span class="node-tool">Daytona · E2B</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIPELINE -->
+    <div class="band">
+      <div class="band-head">
+        <p class="band-title">Data Plane · the SDLC pipeline (each stage = a sandboxed agent)</p>
+        <p class="band-note">self-advances on pass · escalates to human on gate failure</p>
+      </div>
+      <div class="row scroll">
+        <div class="stage">
+          <span class="idx">01</span><span class="nm">Spec</span>
+          <span class="dsc">Ticket → acceptance criteria, scope, test plan.</span>
+          <span class="tl">Spec Kit fmt</span>
+        </div>
+        <span class="arrow">→</span>
+        <div class="stage">
+          <span class="idx">02</span><span class="nm">Plan</span>
+          <span class="dsc">Spec → module-scoped implementation plan.</span>
+          <span class="tl">Agent SDK</span>
+        </div>
+        <span class="arrow">→</span>
+        <div class="stage">
+          <span class="idx">03</span><span class="nm">Code</span>
+          <span class="dsc">Plan → code + tests, inside module boundary.</span>
+          <span class="tl">OpenHands / Cline</span>
+        </div>
+        <span class="arrow">→</span>
+        <div class="stage">
+          <span class="idx">04</span><span class="nm">Test</span>
+          <span class="dsc">Suite + coverage gate; blast-radius check.</span>
+          <span class="tl">CI</span>
+        </div>
+        <span class="arrow">→</span>
+        <div class="stage verify">
+          <span class="idx">05</span><span class="nm">Verify</span>
+          <span class="dsc">Independent critic — tries to refute correctness.</span>
+          <span class="tl">critic-model</span>
+        </div>
+        <span class="arrow">→</span>
+        <div class="stage">
+          <span class="idx">06</span><span class="nm">Review</span>
+          <span class="dsc">Standards & diff review; loops back if needed.</span>
+          <span class="tl">Agent SDK</span>
+        </div>
+        <span class="arrow">→</span>
+        <div class="stage">
+          <span class="idx">07</span><span class="nm">Deploy</span>
+          <span class="dsc">Merge → prod behind flag → canary.</span>
+          <span class="tl">Argo / Flagger</span>
+        </div>
+        <span class="arrow">→</span>
+        <div class="stage">
+          <span class="idx">08</span><span class="nm">Monitor</span>
+          <span class="dsc">Watches module metrics; auto-rollback on regression.</span>
+          <span class="tl">App Insights</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- GUARDRAIL SPINE -->
+    <div class="band" style="border-color:#E7C9C9; background:#FFFCFC;">
+      <div class="band-head">
+        <p class="band-title" style="color:var(--guard);">Guardrail Spine · what makes autonomous-to-prod safe</p>
+        <p class="band-note">every human approval replaced by a gate; human enters only on “escalate”</p>
+      </div>
+      <div class="cards">
+        <div class="node guard">
+          <span class="tag t-guard">Gate</span>
+          <span class="node-name">blast radius</span>
+          <p class="node-desc">CI hard-fails any diff outside the module directory.</p>
+          <span class="node-tool">bespoke check</span>
+        </div>
+        <div class="node guard">
+          <span class="tag t-guard">Gate</span>
+          <span class="node-name">policy engine</span>
+          <p class="node-desc">Escalates on auth / payments / PII / migrations / deps / oversized diff.</p>
+          <span class="node-tool">OPA · Conftest</span>
+        </div>
+        <div class="node guard">
+          <span class="tag t-guard">Gate</span>
+          <span class="node-name">spec conformance</span>
+          <p class="node-desc">Diff must satisfy the spec’s acceptance criteria to merge.</p>
+          <span class="node-tool">Verifier + oasdiff</span>
+        </div>
+        <div class="node guard">
+          <span class="tag t-guard">Gate</span>
+          <span class="node-name">feature flag</span>
+          <p class="node-desc">Ships dark; instant kill switch on the whole module.</p>
+          <span class="node-tool">flag service</span>
+        </div>
+        <div class="node guard">
+          <span class="tag t-guard">Gate</span>
+          <span class="node-name">canary + rollback</span>
+          <p class="node-desc">Watches live metrics; reverts automatically on regression.</p>
+          <span class="node-tool">Argo Rollouts</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- KNOWLEDGE BASE FOUNDATION -->
+    <div class="foundation">
+      <p class="feeds">▲ &nbsp; queried by every stage · re-synced on every merge · “back in sync” = definition of done &nbsp; ▲</p>
+      <div class="band-head" style="margin-top:10px;">
+        <p class="band-title">Knowledge Base · the grounding layer</p>
+        <p class="band-note">keeps intent (spec) and reality (code) coherent</p>
+      </div>
+      <div class="cards">
+        <div class="node">
+          <span class="tag t-adopt">Adopt</span>
+          <span class="node-name">code graph</span>
+          <p class="node-desc">Symbol / call graph over the monolith — “what references X, what breaks if I change Z.”</p>
+          <span class="node-tool">Serena (MCP) · LSP</span>
+        </div>
+        <div class="node">
+          <span class="tag t-adopt">Adopt</span>
+          <span class="node-name">semantic index</span>
+          <p class="node-desc">Embeddings over code, docs, PRs, incidents for fuzzy discovery.</p>
+          <span class="node-tool">Atlas Vector Search</span>
+        </div>
+        <div class="node">
+          <span class="tag t-adapt">Adapt</span>
+          <span class="node-name">spec store</span>
+          <p class="node-desc">Machine-readable spec-as-code in the repo — one version history with the code.</p>
+          <span class="node-tool">Spec Kit / OpenSpec</span>
+        </div>
+        <div class="node build">
+          <span class="tag t-build">Build ★</span>
+          <span class="node-name"><span class="star">◆</span> drift reconciler</span>
+          <p class="node-desc">Bidirectional spec↔code traceability; detects divergence, opens tickets. No off-the-shelf solution exists — this is the moat.</p>
+          <span class="node-tool">on oasdiff · Pact · Serena</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODEL LAYER -->
+    <div class="band">
+      <div class="band-head">
+        <p class="band-title">Model Provider · swappable intelligence</p>
+        <p class="band-note">one abstraction → foundation today, sovereign later is a config change</p>
+      </div>
+      <div class="cards">
+        <div class="node">
+          <span class="tag t-adapt">Adapt</span>
+          <span class="node-name">model gateway</span>
+          <p class="node-desc">Single interface all agents call — routing, budgets, token telemetry.</p>
+          <span class="node-tool">provider-agnostic</span>
+        </div>
+        <div class="node">
+          <span class="tag t-adopt">Adopt</span>
+          <span class="node-name">foundation</span>
+          <p class="node-desc">Frontier capability now: Claude / GPT.</p>
+          <span class="node-tool">API</span>
+        </div>
+        <div class="node">
+          <span class="tag t-build">Build</span>
+          <span class="node-name">sovereign path</span>
+          <p class="node-desc">Self-hosted / fine-tuned LLM + SLM — fractional cost, absolute control.</p>
+          <span class="node-tool">later phase</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="foot">
+    Reuse ≈ 80% (runtime · coder · code-graph · policy · canary) &nbsp;·&nbsp; Build ≈ 20% (reconciler · audit · gates) &nbsp;·&nbsp; Proven first on one contained module, then widened.
+  </p>
+
+</div>
