@@ -10,6 +10,16 @@ no(){ FAIL=$((FAIL+1)); echo "FAIL: $1"; }
 assert_contains(){ printf '%s' "$1" | grep -qE "$2" && ok || no "$3"; }
 assert_not_contains(){ printf '%s' "$1" | grep -qE "$2" && no "$3" || ok; }
 run_section(){ [ "$ONLY" = all ] || [ "$ONLY" = "$1" ]; }
+mk_repo(){ # $1 = fixture superdev parent dir; echoes new repo path
+  local R; R=$(mktemp -d)
+  ( cd "$R" && git init -q \
+    && mkdir -p src docs && echo 'app' > src/app.py && echo 'ov' > docs/OVERVIEW.md \
+    && cp -R "$1"/superdev . && git add -A && git commit -qm init \
+    && C=$(git rev-parse --short HEAD) \
+    && grep -rl '__COMMIT__' superdev | while read -r f; do sed -i '' "s/__COMMIT__/$C/g" "$f"; done \
+    && git add -A && git commit -qm pin ) >/dev/null 2>&1
+  echo "$R"
+}
 
 # ---------- section: lib ----------
 if run_section lib; then
@@ -75,6 +85,23 @@ if run_section hooks; then
   (cd "$D" && "$KIT/hooks/kb-briefing.sh" </dev/null) && ok || no "hooks: briefing no-op exits 0"
   (cd "$D" && echo '{}' | "$KIT/hooks/kb-recall-post.sh") && ok || no "hooks: recall-post no-op exits 0"
   rm -rf "$D"
+fi
+
+# ---------- section: audit ----------
+if run_section audit; then
+  RC=$(mk_repo "$HERE/fixtures/kb-clean")
+  OUT=$("$HERE/kb-audit.sh" --root "$RC" --kb "$RC/superdev")
+  assert_contains "$OUT" 'AUDIT: 0 issues' "audit: clean fixture passes"
+  ls "$RC/superdev/evals/reports/" | grep -q audit.md && ok || no "audit: report written"
+  RD=$(mk_repo "$HERE/fixtures/kb-defects")
+  OUT=$("$HERE/kb-audit.sh" --root "$RD" --kb "$RD/superdev")
+  assert_contains "$OUT" 'anchor-rot: .*src/gone.py' "audit: catches dead anchor"
+  assert_contains "$OUT" "illegal status 'verified'" "audit: catches illegal status"
+  assert_contains "$OUT" 'duplicate invariant ids: INV-1' "audit: catches dup INV"
+  assert_contains "$OUT" 'provenance: .*neither elicited_by nor documented_by' "audit: catches missing provenance"
+  assert_contains "$OUT" 'documented_by path missing: docs/MISSING.md' "audit: catches dead doc path"
+  assert_contains "$OUT" 'AUDIT: 5 issues' "audit: issue count"
+  rm -rf "$RC" "$RD"
 fi
 
 echo "self-test: $PASS passed, $FAIL failed"
