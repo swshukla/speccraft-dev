@@ -14,6 +14,9 @@ if [ "$PIN" = "$LAST" ]; then SYNC="in sync"; else
   SYNC="$(git -C "$ROOT" rev-list --count "$PIN..$LAST" -- . ':(exclude)superdev' 2>/dev/null || echo '?') code commit(s) behind"
 fi
 OPEN=$(grep -cE '^[0-9]+\.' "$KB/QUEUE.md" 2>/dev/null || echo '?')
+LEDGER=$(ls "$KB/ledger" 2>/dev/null | grep -c . || echo 0)
+. "$FORGE/session-kit/evals/telemetry-lib.sh" 2>/dev/null || kb_telemetry(){ :; }
+kb_telemetry kb_status "queue=$OPEN ledger=$LEDGER"
 
 TMP=$(mktemp)
 {
@@ -27,6 +30,7 @@ TMP=$(mktemp)
   echo "- recall before building: \`python3 $FORGE/recall.py --config superdev/kbforge.yaml --files <repo-relative paths>\`"
   echo "- procedures: superdev-interview / superdev-recall / superdev-decide / superdev-diverge / superdev-ratify"
   echo "  (Claude: skills; Codex & OpenCode: /superdev-* commands)"
+  [ -f "$KB/evals/health.md" ] && cat "$KB/evals/health.md"
 } > "$TMP"
 cmp -s "$TMP" "$KB/KB-STATUS.md" 2>/dev/null && { rm -f "$TMP"; exit 0; }
 mv "$TMP" "$KB/KB-STATUS.md"

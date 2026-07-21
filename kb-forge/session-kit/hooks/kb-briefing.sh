@@ -6,6 +6,13 @@ KB=$ROOT/superdev
 FORGE="${KBFORGE_HOME:-$HOME/superdev/kb-forge}"
 [ -f "$KB/kb/derived/inventory.md" ] || exit 0
 
+. "$FORGE/session-kit/evals/telemetry-lib.sh" 2>/dev/null || kb_telemetry(){ :; }
+if [ ! -t 0 ]; then IN=$(cat 2>/dev/null || true)
+  KB_SESSION_ID=$(printf '%s' "$IN" | jq -r '.session_id // "nosession"' 2>/dev/null || echo nosession)
+fi
+export KB_SESSION_ID
+kb_telemetry session_start
+
 PIN=$(grep -m1 '^source_commit:' "$KB/kb/derived/inventory.md" | awk '{print $2}')
 LASTCODE=$(git -C "$ROOT" log -1 --format=%h -- . ':(exclude)superdev' 2>/dev/null)
 if [ "$PIN" = "$LASTCODE" ]; then

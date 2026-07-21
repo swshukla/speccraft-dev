@@ -57,5 +57,25 @@ if run_section report; then
   rm -rf "$T"
 fi
 
+# ---------- section: hooks ----------
+if run_section hooks; then
+  KIT="$(cd "$HERE/.." && pwd)"
+  for s in "$KIT/hooks/kb-briefing.sh" "$KIT/hooks/kb-recall-post.sh" \
+           "$KIT/hooks/kb-guard.sh" "$KIT/hooks/kb-status.sh"; do
+    bash -n "$s" && ok || no "hooks: bash syntax $s"
+    grep -q 'telemetry-lib.sh' "$s" && ok || no "hooks: $s sources telemetry lib"
+  done
+  sh -n "$KIT/pre-commit" && ok || no "hooks: sh syntax pre-commit"
+  grep -q 'ratify_used' "$KIT/pre-commit" && ok || no "hooks: pre-commit logs ratify_used"
+  grep -q 'guard_commit_block' "$KIT/pre-commit" && ok || no "hooks: pre-commit logs guard_commit_block"
+  grep -q 'kb_telemetry kb_status' "$KIT/hooks/kb-status.sh" && ok || no "hooks: kb-status logs counts"
+  grep -q 'evals/health.md' "$KIT/hooks/kb-status.sh" && ok || no "hooks: kb-status embeds health"
+  # safety: hooks still no-op cleanly outside any KB repo
+  D=$(mktemp -d); (cd "$D" && git init -q .)
+  (cd "$D" && "$KIT/hooks/kb-briefing.sh" </dev/null) && ok || no "hooks: briefing no-op exits 0"
+  (cd "$D" && echo '{}' | "$KIT/hooks/kb-recall-post.sh") && ok || no "hooks: recall-post no-op exits 0"
+  rm -rf "$D"
+fi
+
 echo "self-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
