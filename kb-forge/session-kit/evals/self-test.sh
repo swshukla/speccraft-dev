@@ -104,5 +104,28 @@ if run_section audit; then
   rm -rf "$RC" "$RD"
 fi
 
+# ---------- section: judge ----------
+if run_section judge; then
+  RC=$(mk_repo "$HERE/fixtures/kb-clean")
+  chmod +x "$HERE/fixtures/bin/claude"
+  OUT=$(PATH="$HERE/fixtures/bin:$PATH" "$HERE/kb-audit.sh" --root "$RC" --kb "$RC/superdev" --judge)
+  R=$(cat "$RC"/superdev/evals/reports/*-audit.md)
+  assert_contains "$R" 'SUPPORTED' "judge: verdicts in report"
+  assert_contains "$R" 'precision 0.33' "judge: precision computed (1/3)"
+  Q=$(cat "$RC/superdev/QUEUE.md")
+  assert_contains "$Q" 'CONTRADICTED.*INV-2' "judge: contradiction queued"
+  assert_contains "$Q" 'POSSIBLY_STALE.*INV-1' "judge: stale queued"
+  assert_not_contains "$Q" 'retail users' "judge: SUPPORTED not queued"
+  grep -q 'last audit: .*precision 0.33' "$RC/superdev/evals/health.md" \
+    && ok || no "judge: health line upserted"
+  # elicited intent files are never sampled as claims (only INVs get the compliance pass)
+  assert_not_contains "$R" 'Identity: a demo product' "judge: elicited claims not judged"
+  # no claude on PATH -> semantic SKIPPED, still exit 0
+  RC2=$(mk_repo "$HERE/fixtures/kb-clean")
+  OUT2=$(PATH=/usr/bin:/bin "$HERE/kb-audit.sh" --root "$RC2" --kb "$RC2/superdev" --judge)
+  grep -q 'SKIPPED' "$RC2"/superdev/evals/reports/*-audit.md && ok || no "judge: skips without claude"
+  rm -rf "$RC" "$RC2"
+fi
+
 echo "self-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

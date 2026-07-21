@@ -58,6 +58,75 @@ STALE=$(sort -rn <<<"$STALE" | grep -v '^$' | head -10)
 PIN=$(grep -m1 '^source_commit:' "$KB/kb/derived/inventory.md" 2>/dev/null | awk '{print $2}')
 BEHIND=$(git -C "$ROOT" rev-list --count "$PIN..HEAD" 2>/dev/null || echo '?')
 
+SEM_LINES="SKIPPED (run with --judge)"
+PRECISION=""; NSAMP=0
+if [ "$JUDGE" -eq 1 ]; then
+  if ! command -v claude >/dev/null 2>&1; then
+    SEM_LINES="SKIPPED (claude CLI not found)"
+  else
+    cfgval(){ awk -v k="$1:" '$1==k {print $2; exit}' "$KB/kbforge.yaml" 2>/dev/null; }
+    CAP=$(cfgval judge_sample_size); CAP=${CAP:-20}
+    MINP=$(cfgval min_precision); MINP=${MINP:-0.80}
+    CLAIMS=""
+    # sample observed/documented claims, staleness-ranked file order; never elicited
+    while read -r _n f; do
+      [ -z "${f:-}" ] && continue
+      st=$(frontval "$ROOT/$f" status)
+      case "$st" in ratified|ratified-partial) continue;; esac
+      while read -r c; do
+        [ -z "$c" ] && continue
+        [ "$(grep -c '^- claim' <<<"$CLAIMS")" -ge "$CAP" ] && break
+        CLAIMS+="- claim: ${c#- } | file: $f"$'\n'
+      done <<<"$(grep -E '^- ' "$ROOT/$f")"
+    done <<<"$STALE"
+    # invariant compliance pass (always included)
+    while read -r inv; do
+      [ -z "$inv" ] && continue
+      CLAIMS+="- claim: ${inv#\#\# } | file: superdev/kb/normative/01-invariants.md"$'\n'
+    done <<<"$(grep -E '^#+ *INV-' "$KB/kb/normative/01-invariants.md" 2>/dev/null)"
+    NSAMP=$(grep -c '^- claim' <<<"$CLAIMS")
+    # code context: head of every anchored path referenced by sampled files
+    CTX=""
+    for p in $(for f in "$KB"/kb/normative/*.md "$KB"/kb/inferred/*.md; do
+                 [ -f "$f" ] && anchor_paths "$f"; done | sort -u); do
+      [ -f "$ROOT/$p" ] && CTX+="### $p"$'\n'"$(sed -n '1,80p' "$ROOT/$p")"$'\n'
+    done
+    PROMPT="$(cat "$HERE/judge-rubric.md")"$'\n\n## Claims\n'"$CLAIMS"$'\n## Code context\n'"$CTX"
+    VERD=$(claude -p "$PROMPT" --output-format text 2>/dev/null | sed -n '/^\[/,$p')
+    if jq -e . >/dev/null 2>&1 <<<"$VERD"; then
+      NS=$(jq '[.[]|select(.verdict=="SUPPORTED")]|length' <<<"$VERD")
+      NT=$(jq 'length' <<<"$VERD")
+      PRECISION=$(awk "BEGIN{printf \"%.2f\", $NT ? $NS/$NT : 0}")
+      SEM_LINES=$(jq -r '.[] | "- \(.verdict): \(.claim) [\(.file)] — \(.evidence)"' <<<"$VERD")
+      # route non-SUPPORTED verdicts to QUEUE (session lane; append-only)
+      N=$(grep -cE '^[0-9]+\.' "$KB/QUEUE.md" 2>/dev/null); N=${N:-0}
+      while read -r line; do
+        [ -z "$line" ] && continue
+        N=$((N+1)); echo "$N. [evals-audit $(date +%F)] $line" >> "$KB/QUEUE.md"
+      done <<<"$(jq -r '.[] | select(.verdict!="SUPPORTED")
+        | "\(.verdict): \(.claim) [\(.file)] — \(.evidence)"' <<<"$VERD")"
+      # upsert health line
+      mkdir -p "$KB/evals"
+      H="$KB/evals/health.md"
+      grep -v '^- last audit:' "$H" 2>/dev/null > "$H.tmp" || true
+      echo "- last audit: $(date +%F) precision $PRECISION ($NT sampled)" >> "$H.tmp"
+      mv "$H.tmp" "$H"
+      if [ "$NT" -ge 5 ] && awk "BEGIN{exit !($PRECISION < $MINP)}"; then
+        mkdir -p "$KB/findings"
+        FD="$KB/findings/$(date +%F)-evals-kb-precision.md"
+        [ -f "$FD" ] || cat > "$FD" <<EOF
+# Finding: KB claim precision below threshold
+- audit $(date +%F): precision $PRECISION over $NT sampled claims (< $MINP)
+- non-SUPPORTED verdicts were appended to superdev/QUEUE.md — adjudicate via
+  superdev-diverge (CONTRADICTED) / superdev-ratify (confirm) / dismiss.
+EOF
+      fi
+    else
+      SEM_LINES="SKIPPED (judge returned unparseable output)"
+    fi
+  fi
+fi
+
 mkdir -p "$KB/evals/reports"
 R="$KB/evals/reports/$(date +%F)-audit.md"
 { echo "# KB truth audit — $(date +%F)"
@@ -66,7 +135,9 @@ R="$KB/evals/reports/$(date +%F)-audit.md"
   echo; echo "## Staleness top-10 (code commits on anchors since claim last touched)"
   sed 's/^/- /' <<<"$STALE"
   echo; echo "derived: pin $PIN is $BEHIND commit(s) behind HEAD"
-  echo; echo "## Semantic"; echo "SKIPPED (run with --judge)"
+  echo; echo "## Semantic"
+  [ -n "$PRECISION" ] && echo "precision $PRECISION ($NSAMP sampled)"
+  printf '%s\n' "$SEM_LINES"
 } > "$R"
 echo "AUDIT: ${#ISSUES[@]} issues"
 for i in "${ISSUES[@]+"${ISSUES[@]}"}"; do echo "$i"; done
