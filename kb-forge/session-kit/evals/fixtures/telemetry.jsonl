@@ -1,0 +1,11 @@
+{"ts":"REPLACETS","session":"s1","event":"session_start","detail":""}
+{"ts":"REPLACETS","session":"s1","event":"recall_ran","detail":"src/app.py"}
+{"ts":"REPLACETS","session":"s1","event":"kb_status","detail":"queue=14 ledger=3"}
+not json at all
+{"ts":"REPLACETS","session":"s2","event":"session_start","detail":""}
+{"ts":"REPLACETS","session":"s2","event":"recall_empty","detail":"src/new.py"}
+{"ts":"REPLACETS","session":"s2","event":"ratify_used","detail":""}
+{"ts":"REPLACETS","session":"s3","event":"guard_commit_block","detail":""}
+{"broken":
+{"ts":"2020-01-01T00:00:00Z","session":"old","event":"recall_ran","detail":"ancient, must be pruned"}
+{"ts":"REPLACETS","session":"s2","event":"kb_status","detail":"queue=12 ledger=3"}

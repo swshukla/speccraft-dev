@@ -32,5 +32,30 @@ if run_section lib; then
   rm -rf "$T"; unset KB
 fi
 
+# ---------- section: report ----------
+if run_section report; then
+  T=$(mktemp -d); KB="$T/superdev"; mkdir -p "$KB/evals" "$KB/findings"
+  NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  sed "s/REPLACETS/$NOW/" "$HERE/fixtures/telemetry.jsonl" > "$KB/evals/telemetry.jsonl"
+  printf -- '- last audit: none\n' > /dev/null # (health starts absent)
+  OUT=$("$HERE/telemetry-report.sh" --kb "$KB")
+  assert_contains "$OUT" 'recall 1/2' "report: recall rate 1/2 sessions"
+  assert_contains "$OUT" 'ratify 1 used, 1 blocked' "report: ratify counts"
+  assert_contains "$OUT" 'queue 14→12' "report: queue trend"
+  assert_contains "$OUT" 'unparseable 2' "report: malformed counted"
+  grep -q 'recall 1/2' "$KB/evals/health.md" && ok || no "report: health.md written"
+  # GC: pruned the 2020 line and the malformed lines
+  grep -q '"session":"old"' "$KB/evals/telemetry.jsonl" && no "report: GC pruned old line" || ok
+  L=$(wc -l < "$KB/evals/telemetry.jsonl" | tr -d ' ')
+  [ "$L" -eq 8 ] && ok || no "report: GC kept 8 in-retention parseable lines (got $L)"
+  # breach finding NOT written (only 2 sessions < 5 minimum)
+  ls "$KB/findings/" | grep -q evals-recall && no "report: no breach under min sessions" || ok
+  # preserves audit/behavioral lines on rerun
+  echo '- last audit: 2026-07-21 precision 0.85' >> "$KB/evals/health.md"
+  "$HERE/telemetry-report.sh" --kb "$KB" > /dev/null
+  grep -q 'last audit: 2026-07-21' "$KB/evals/health.md" && ok || no "report: preserves audit line"
+  rm -rf "$T"
+fi
+
 echo "self-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
