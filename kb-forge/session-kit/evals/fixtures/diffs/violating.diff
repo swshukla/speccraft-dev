@@ -1,0 +1,4 @@
++++ b/backend/app/api.py
++@router.patch("/calls/{id}")
++def edit_call(id: int, price: float):
++    db.execute("UPDATE calls SET target=? WHERE id=?", (price, id))

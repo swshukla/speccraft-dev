@@ -127,5 +127,16 @@ if run_section judge; then
   rm -rf "$RC" "$RC2"
 fi
 
+# ---------- section: behavioral ----------
+if run_section behavioral; then
+  CT="$HERE/behavioral/check-tripwires.sh"
+  OUT=$("$CT" "$HERE/fixtures/diffs/tripwires.txt" "$HERE/fixtures/diffs/violating.diff")
+  assert_contains "$OUT" 'HITS: 2' "behavioral: violating diff trips both"
+  OUT=$("$CT" "$HERE/fixtures/diffs/tripwires.txt" "$HERE/fixtures/diffs/clean.diff")
+  assert_contains "$OUT" 'HITS: 0' "behavioral: clean diff trips none"
+  bash -n "$HERE/behavioral/run.sh" && ok || no "behavioral: run.sh syntax"
+  grep -q 'worktree remove' "$HERE/behavioral/run.sh" && ok || no "behavioral: worktrees cleaned up"
+fi
+
 echo "self-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

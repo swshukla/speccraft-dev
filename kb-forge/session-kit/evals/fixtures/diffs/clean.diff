@@ -1,0 +1,4 @@
++++ b/backend/app/api.py
++@router.post("/calls/{id}/corrections")
++def append_correction(id: int, price: float):
++    db.add(CallCorrection(call_id=id, target=price))
