@@ -60,14 +60,22 @@ Agent passes (interview, extraction, confrontation) run as Claude Code / Codex /
 
 ## Setup
 
-The toolkit lives once per machine at `~/.speccraft/kb-forge`. Requirements: `python3`, `git`. That's it — no API keys, no services.
+```bash
+pipx install speccraft                       # published release
+# or, developing kb-forge itself:
+pipx install -e /path/to/kb-forge            # editable, from this checkout
+```
+Installs the `speccraft` command and, on first `speccraft init`, links
+`~/.speccraft/kb-forge` to the installed toolkit. Requirements: `python3`,
+`git`. That's it — no API keys, no services.
 
 ## Using it on a repo
 
 **1 — Bootstrap the mechanical layers (one command):**
 ```bash
-~/.speccraft/kb-forge/kbforge-init.sh /path/to/your-repo
+speccraft init /path/to/your-repo
 ```
+(equivalent to running `~/.speccraft/kb-forge/kbforge-init.sh /path/to/your-repo` directly, if you'd rather skip the pip install)
 This scaffolds `your-repo/.speccraft/`, runs every harvester (pinned to your last code commit), installs the four `speccraft-*` procedures for all three tools, wires `AGENTS.md`/`CLAUDE.md`, arms the git + session hooks, and writes `KB-STATUS.md`.
 
 **2 — Tune one file:** edit `.speccraft/kbforge.yaml` — set `components` and `risk_paths` (the auth / money / truth-critical path patterns). Commit the scaffold.

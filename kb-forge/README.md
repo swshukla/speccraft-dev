@@ -57,9 +57,11 @@ Speccraft's answer is a **grounded ratchet**: seed a knowledge base from human-a
 ## Quickstart
 
 ```bash
-pipx install git+https://github.com/swshukla/speccraft.git
+pipx install speccraft
 speccraft init /path/to/your-repo
 ```
+
+> Want unreleased `main`? `pipx install git+https://github.com/swshukla/speccraft.git` instead.
 
 > **Requirements:** `python3`, `git`. No API keys, no services, no LLM calls in the tooling itself — the harvesters are pure stdlib.
 
