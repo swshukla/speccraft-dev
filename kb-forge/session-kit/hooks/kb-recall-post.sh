@@ -3,8 +3,8 @@
 # session touches a product file, inject the KB facts anchored to it.
 # Repo-relative; deduped per session+file; KB files don't trigger recall.
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-KB=$ROOT/superdev
-FORGE="${KBFORGE_HOME:-$HOME/superdev/kb-forge}"
+KB=$ROOT/.speccraft
+FORGE="${KBFORGE_HOME:-$HOME/.speccraft/kb-forge}"
 [ -f "$KB/kbforge.yaml" ] || exit 0
 . "$FORGE/session-kit/evals/telemetry-lib.sh" 2>/dev/null || kb_telemetry(){ :; }
 
@@ -17,7 +17,7 @@ case "$FP" in
   *) exit 0 ;;
 esac
 
-CACHE="${TMPDIR:-/tmp}/superdev-recall-seen-$SID"
+CACHE="${TMPDIR:-/tmp}/speccraft-recall-seen-$SID"
 grep -qxF "$REL" "$CACHE" 2>/dev/null && exit 0
 echo "$REL" >> "$CACHE"
 
@@ -28,5 +28,5 @@ kb_telemetry recall_ran "$REL"
 
 printf '%s' "$OUT" | jq -Rs --arg rel "$REL" \
   '{hookSpecificOutput:{hookEventName:"PostToolUse",
-    additionalContext:("KB recall for \($rel) — honor ratified facts; queue divergences (superdev-diverge), never self-ratify:\n" + .)}}'
+    additionalContext:("KB recall for \($rel) — honor ratified facts; queue divergences (speccraft-diverge), never self-ratify:\n" + .)}}'
 exit 0

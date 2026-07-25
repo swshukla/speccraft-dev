@@ -10,20 +10,20 @@ no(){ FAIL=$((FAIL+1)); echo "FAIL: $1"; }
 assert_contains(){ printf '%s' "$1" | grep -qE "$2" && ok || no "$3"; }
 assert_not_contains(){ printf '%s' "$1" | grep -qE "$2" && no "$3" || ok; }
 run_section(){ [ "$ONLY" = all ] || [ "$ONLY" = "$1" ]; }
-mk_repo(){ # $1 = fixture superdev parent dir; echoes new repo path
+mk_repo(){ # $1 = fixture .speccraft parent dir; echoes new repo path
   local R; R=$(mktemp -d)
   ( cd "$R" && git init -q \
     && mkdir -p src docs && echo 'app' > src/app.py && echo 'ov' > docs/OVERVIEW.md \
-    && cp -R "$1"/superdev . && git add -A && git commit -qm init \
+    && cp -R "$1"/.speccraft . && git add -A && git commit -qm init \
     && C=$(git rev-parse --short HEAD) \
-    && grep -rl '__COMMIT__' superdev | while read -r f; do sed -i '' "s/__COMMIT__/$C/g" "$f"; done \
+    && grep -rl '__COMMIT__' .speccraft | while read -r f; do sed -i '' "s/__COMMIT__/$C/g" "$f"; done \
     && git add -A && git commit -qm pin ) >/dev/null 2>&1
   echo "$R"
 }
 
 # ---------- section: lib ----------
 if run_section lib; then
-  T=$(mktemp -d); export KB="$T/superdev"; mkdir -p "$KB"
+  T=$(mktemp -d); export KB="$T/.speccraft"; mkdir -p "$KB"
   . "$HERE/telemetry-lib.sh"
   KB_SESSION_ID=sess1 kb_telemetry recall_ran "src/app.py"
   OUT=$(cat "$KB/evals/telemetry.jsonl" 2>/dev/null)
@@ -44,7 +44,7 @@ fi
 
 # ---------- section: report ----------
 if run_section report; then
-  T=$(mktemp -d); KB="$T/superdev"; mkdir -p "$KB/evals" "$KB/findings"
+  T=$(mktemp -d); KB="$T/.speccraft"; mkdir -p "$KB/evals" "$KB/findings"
   NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   sed "s/REPLACETS/$NOW/" "$HERE/fixtures/telemetry.jsonl" > "$KB/evals/telemetry.jsonl"
   printf -- '- last audit: none\n' > /dev/null # (health starts absent)
@@ -90,11 +90,11 @@ fi
 # ---------- section: audit ----------
 if run_section audit; then
   RC=$(mk_repo "$HERE/fixtures/kb-clean")
-  OUT=$("$HERE/kb-audit.sh" --root "$RC" --kb "$RC/superdev")
+  OUT=$("$HERE/kb-audit.sh" --root "$RC" --kb "$RC/.speccraft")
   assert_contains "$OUT" 'AUDIT: 0 issues' "audit: clean fixture passes"
-  ls "$RC/superdev/evals/reports/" | grep -q audit.md && ok || no "audit: report written"
+  ls "$RC/.speccraft/evals/reports/" | grep -q audit.md && ok || no "audit: report written"
   RD=$(mk_repo "$HERE/fixtures/kb-defects")
-  OUT=$("$HERE/kb-audit.sh" --root "$RD" --kb "$RD/superdev")
+  OUT=$("$HERE/kb-audit.sh" --root "$RD" --kb "$RD/.speccraft")
   assert_contains "$OUT" 'anchor-rot: .*src/gone.py' "audit: catches dead anchor"
   assert_contains "$OUT" "illegal status 'verified'" "audit: catches illegal status"
   assert_contains "$OUT" 'duplicate invariant ids: INV-1' "audit: catches dup INV"
@@ -108,22 +108,22 @@ fi
 if run_section judge; then
   RC=$(mk_repo "$HERE/fixtures/kb-clean")
   chmod +x "$HERE/fixtures/bin/claude"
-  OUT=$(PATH="$HERE/fixtures/bin:$PATH" "$HERE/kb-audit.sh" --root "$RC" --kb "$RC/superdev" --judge)
-  R=$(cat "$RC"/superdev/evals/reports/*-audit.md)
+  OUT=$(PATH="$HERE/fixtures/bin:$PATH" "$HERE/kb-audit.sh" --root "$RC" --kb "$RC/.speccraft" --judge)
+  R=$(cat "$RC"/.speccraft/evals/reports/*-audit.md)
   assert_contains "$R" 'SUPPORTED' "judge: verdicts in report"
   assert_contains "$R" 'precision 0.33' "judge: precision computed (1/3)"
-  Q=$(cat "$RC/superdev/QUEUE.md")
+  Q=$(cat "$RC/.speccraft/QUEUE.md")
   assert_contains "$Q" 'CONTRADICTED.*INV-2' "judge: contradiction queued"
   assert_contains "$Q" 'POSSIBLY_STALE.*INV-1' "judge: stale queued"
   assert_not_contains "$Q" 'retail users' "judge: SUPPORTED not queued"
-  grep -q 'last audit: .*precision 0.33' "$RC/superdev/evals/health.md" \
+  grep -q 'last audit: .*precision 0.33' "$RC/.speccraft/evals/health.md" \
     && ok || no "judge: health line upserted"
   # elicited intent files are never sampled as claims (only INVs get the compliance pass)
   assert_not_contains "$R" 'Identity: a demo product' "judge: elicited claims not judged"
   # no claude on PATH -> semantic SKIPPED, still exit 0
   RC2=$(mk_repo "$HERE/fixtures/kb-clean")
-  OUT2=$(PATH=/usr/bin:/bin "$HERE/kb-audit.sh" --root "$RC2" --kb "$RC2/superdev" --judge)
-  grep -q 'SKIPPED' "$RC2"/superdev/evals/reports/*-audit.md && ok || no "judge: skips without claude"
+  OUT2=$(PATH=/usr/bin:/bin "$HERE/kb-audit.sh" --root "$RC2" --kb "$RC2/.speccraft" --judge)
+  grep -q 'SKIPPED' "$RC2"/.speccraft/evals/reports/*-audit.md && ok || no "judge: skips without claude"
   rm -rf "$RC" "$RC2"
 fi
 

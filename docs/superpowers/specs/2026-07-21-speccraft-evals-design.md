@@ -1,15 +1,15 @@
-# superdev Evals — Design
+# Speccraft Evals — Design
 
 **Date:** 2026-07-21
 **Status:** Approved in design review (brainstorming session)
-**Scope:** Measurement layer for the built kb-forge / superdev system (session-kit as
+**Scope:** Measurement layer for the built kb-forge / speccraft system (session-kit as
 installed in repos like stocktickerapp) — NOT the aspirational full-SDLC eval doctrine
 in `docs/agentic-sdlc/07-evals-layer.md`, which remains deferred until multi-repo /
 customer scale.
 
 ## Problem
 
-The superdev KB system (trust-graded KB, five skills, session hooks, ratify loop) emits
+The speccraft KB system (trust-graded KB, five skills, session hooks, ratify loop) emits
 zero measurement. We cannot answer "is this system working?" — which decomposes into
 three distinct claims:
 
@@ -25,7 +25,7 @@ ground-truth credibility, and credibility requires evidence.
 - **Layered pyramid, all three claims**, sequenced cheapest-first.
 - **Harness = Approach A**: deterministic scripts in the kit, wired to existing hooks;
   a single capped LLM-judge pass for semantic checks; behavioral suite run manually.
-  A thin `superdev-eval` skill is added LATER as a front-end only (Approach B); the
+  A thin `speccraft-eval` skill is added LATER as a front-end only (Approach B); the
   external pytest/CI harness (Approach C) is explicitly deferred.
 - **Core rule, inherited from the KB itself:** an eval you can't trust is worse than
   none. Every number that gates or scores is deterministic. The LLM judge only ever
@@ -57,7 +57,7 @@ kb-forge/session-kit/evals/            # canonical, distributed by install.sh
   self-test.sh                         # seeded-defect self-test of the machinery
   fixtures/                            # miniature KB + telemetry + diffs w/ seeded defects
 
-<repo>/superdev/evals/                 # per-repo
+<repo>/.speccraft/evals/                 # per-repo
   telemetry.jsonl                      # appended by hooks — GITIGNORED
   behavioral-tasks.md                  # repo-specific task instances — tracked
   reports/YYYY-MM-DD-audit.md          # Tier 2 output — tracked
@@ -66,7 +66,7 @@ kb-forge/session-kit/evals/            # canonical, distributed by install.sh
 
 Results surface where people already look: a **Health** block in `KB-STATUS.md`
 (Tier 1 rates, last audit precision, last behavioral delta). Threshold breaches write
-entries to `superdev/findings/`. Thresholds and knobs live in `kbforge.yaml` under a
+entries to `.speccraft/findings/`. Thresholds and knobs live in `kbforge.yaml` under a
 new `evals:` block so per-repo tuning never means editing scripts.
 
 ## Tier 1 — Compliance telemetry (always on, free)
@@ -144,12 +144,12 @@ Every check is either **mechanical** (deterministic, always runs) or **semantic*
 - **Verdicts:** `SUPPORTED` / `POSSIBLY_STALE` / `CONTRADICTED`, each requiring cited
   `file:line` evidence per `judge-rubric.md`.
 - **Judge never edits the KB:** `CONTRADICTED` → divergence candidate queued for
-  `superdev-diverge`; `POSSIBLY_STALE` → `QUEUE.md` item. A human (or the ratify flow)
+  `speccraft-diverge`; `POSSIBLY_STALE` → `QUEUE.md` item. A human (or the ratify flow)
   closes them.
 
 ### Output & error handling
 
-`superdev/evals/reports/YYYY-MM-DD-audit.md` (tracked): precision (% of sampled claims
+`.speccraft/evals/reports/YYYY-MM-DD-audit.md` (tracked): precision (% of sampled claims
 SUPPORTED), anchor-rot count, staleness top-10, judge verdicts with evidence. Headline
 numbers go to the Health block. Precision below `evals.min_precision` (default 0.80)
 writes a `findings/` entry.
@@ -167,7 +167,7 @@ same task, same model, one session KB-armed, one KB-blind.
 
 Tasks are repo-specific (derived from *this repo's* invariants). The kit ships the
 format and grading rubric (`behavioral/tasks-template.md`); each repo keeps 5–8
-instances in `superdev/evals/behavioral-tasks.md`. Each task is a *temptation*:
+instances in `.speccraft/evals/behavioral-tasks.md`. Each task is a *temptation*:
 
 - **One per high-stakes `INV-N`:** a plausible feature request whose easiest
   implementation violates the invariant (e.g., INV says the calls ledger is
@@ -186,7 +186,7 @@ second yfinance client", "no recall invocation in transcript").
 For each task, two throwaway git worktrees:
 
 - **Armed** — repo exactly as installed (KB, skills, hooks present).
-- **Blind** — worktree with `superdev/`, the `superdev-*` skills, and the KB hooks
+- **Blind** — worktree with `.speccraft/`, the `speccraft-*` skills, and the KB hooks
   stripped.
 
 Same `claude -p` prompt in each. Capture diff + transcript; discard worktrees after
@@ -200,7 +200,7 @@ judgment calls (did it push back appropriately?). Score per run = tripwires hit 
 reuse misses. Headline metric = **armed − blind delta**, reported in
 `reports/YYYY-MM-DD-behavioral.md` and the Health block.
 
-## `superdev-eval` skill (Phase 4, front-end only)
+## `speccraft-eval` skill (Phase 4, front-end only)
 
 A thin sixth skill in the kit: runs the scripts, narrates results, walks the user
 through queued judge verdicts (ratify / diverge / dismiss each). Contains **no
@@ -230,7 +230,7 @@ planted, we don't trust it to catch real ones.
    pass), each with self-test fixtures.
 3. **Tier 3:** task template in the kit, author stocktickerapp's task instances from
    its real INVs, `run.sh` + grading sheet, first paired run.
-4. **`superdev-eval` skill** front-end.
+4. **`speccraft-eval` skill** front-end.
 
 **Distribution:** `install.sh` gains an `evals/` copy step alongside the existing
 skills loop; updated hooks propagate the same way.

@@ -1,6 +1,6 @@
 #!/bin/bash
 # kb-forge session-kit installer — arms ONE CLONE of a repo that has a
-# superdev/ KB. Idempotent; warns instead of clobbering. Tracked artifacts
+# .speccraft/ KB. Idempotent; warns instead of clobbering. Tracked artifacts
 # (skills, AGENTS.md section, commands) install once per repo and travel
 # with clones; hooks + settings.local.json must be re-run per clone/machine.
 #
@@ -8,12 +8,12 @@
 set -e
 REPO="${1:-$(git rev-parse --show-toplevel)}"
 KIT="$(cd "$(dirname "$0")" && pwd)"
-[ -f "$REPO/superdev/kbforge.yaml" ] || { echo "no superdev/kbforge.yaml in $REPO — run kbforge-init.sh first"; exit 1; }
+[ -f "$REPO/.speccraft/kbforge.yaml" ] || { echo "no .speccraft/kbforge.yaml in $REPO — run kbforge-init.sh first"; exit 1; }
 
 chmod +x "$KIT"/hooks/*.sh "$KIT/post-commit" "$KIT/pre-commit"
 
 # 1. AGENTS.md — shared cross-agent rules (Codex/OpenCode read it natively)
-if [ -f "$REPO/AGENTS.md" ] && grep -q "Knowledge Base (superdev/)" "$REPO/AGENTS.md"; then
+if [ -f "$REPO/AGENTS.md" ] && grep -q "Knowledge Base (.speccraft/)" "$REPO/AGENTS.md"; then
   echo "AGENTS.md: KB section already present"
 else
   printf '\n' >> "$REPO/AGENTS.md" 2>/dev/null || true
@@ -33,23 +33,23 @@ fi
 # 3. Skills (tracked, per repo). One source, three registries:
 #    .claude/skills (Claude Code) + .agents/skills (Codex & OpenCode both
 #    read the Agent Skills standard natively) + .opencode/commands (explicit
-#    /superdev-* invocation in OpenCode).
-for s in superdev-interview superdev-recall superdev-decide superdev-diverge superdev-ratify; do
+#    /speccraft-* invocation in OpenCode).
+for s in speccraft-interview speccraft-recall speccraft-decide speccraft-diverge speccraft-ratify; do
   mkdir -p "$REPO/.claude/skills/$s" "$REPO/.agents/skills/$s"
   cp "$KIT/skills/$s/SKILL.md" "$REPO/.claude/skills/$s/SKILL.md"
   cp "$KIT/skills/$s/SKILL.md" "$REPO/.agents/skills/$s/SKILL.md"
 done
 mkdir -p "$REPO/.opencode/commands"
-cp "$KIT/opencode-commands/"superdev-*.md "$REPO/.opencode/commands/" 2>/dev/null || true
+cp "$KIT/opencode-commands/"speccraft-*.md "$REPO/.opencode/commands/" 2>/dev/null || true
 echo "skills: installed to .claude/skills/ + .agents/skills/ (+ .opencode/commands)"
 
 # 3c. Evals (tier-1 telemetry + audits run FROM the kit; repo only needs state)
-grep -qx 'superdev/evals/telemetry.jsonl' "$REPO/.gitignore" 2>/dev/null \
-  || echo 'superdev/evals/telemetry.jsonl' >> "$REPO/.gitignore"
-mkdir -p "$REPO/superdev/evals/reports"
-touch "$REPO/superdev/evals/reports/.gitkeep"
-if ! grep -q '^evals:' "$REPO/superdev/kbforge.yaml"; then
-  cat >> "$REPO/superdev/kbforge.yaml" <<'EOF'
+grep -qx '.speccraft/evals/telemetry.jsonl' "$REPO/.gitignore" 2>/dev/null \
+  || echo '.speccraft/evals/telemetry.jsonl' >> "$REPO/.gitignore"
+mkdir -p "$REPO/.speccraft/evals/reports"
+touch "$REPO/.speccraft/evals/reports/.gitkeep"
+if ! grep -q '^evals:' "$REPO/.speccraft/kbforge.yaml"; then
+  cat >> "$REPO/.speccraft/kbforge.yaml" <<'EOF'
 evals:
   report_window_days: 14
   telemetry_retention_days: 90
@@ -60,10 +60,10 @@ EOF
 fi
 echo "evals: gitignore + kbforge.yaml evals block + reports dir ensured"
 
-# 3b. Codex explicit /superdev-* prompts (user-global, once per machine; Codex has
+# 3b. Codex explicit /speccraft-* prompts (user-global, once per machine; Codex has
 #     no repo-level prompts — its native path is .agents/skills above)
 mkdir -p "$HOME/.codex/prompts"
-for p in "$KIT/codex-prompts/"superdev-*.md; do
+for p in "$KIT/codex-prompts/"speccraft-*.md; do
   [ -f "$HOME/.codex/prompts/$(basename "$p")" ] || cp "$p" "$HOME/.codex/prompts/"
 done
 echo "codex prompts: ensured in ~/.codex/prompts/"

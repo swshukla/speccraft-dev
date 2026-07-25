@@ -4,7 +4,7 @@
 Walks a product repo and harvests what code makes certain — routes, data
 models, tests, churn, module map — into <kb-repo>/kb/derived/. No LLM runs
 here; every fact carries a path:line citation pinned to the last CODE commit
-(HEAD moves with KB ship-loop commits under superdev/ — those don't count).
+(HEAD moves with KB ship-loop commits under .speccraft/ — those don't count).
 Harvest reads a `git archive` snapshot at that pin, never the working tree.
 
 Usage: python3 seed0.py --config /path/to/<product>-kb/kbforge.yaml
@@ -15,7 +15,7 @@ from collections import defaultdict
 
 SKIP_DIRS = {"node_modules", ".git", ".next", "__pycache__", ".pytest_cache",
              "dist", "build", ".venv", "venv", ".turbo", "coverage", ".DS_Store",
-             "superdev"}   # superdev/ = the KB itself, tracked inside the repo
+             ".speccraft"}   # .speccraft/ = the KB itself, tracked inside the repo
 CODE_EXT = {".py", ".ts", ".tsx", ".js", ".jsx", ".sql", ".yaml", ".yml", ".json", ".md", ".css", ".sh", ".toml"}
 RISK_PAT = re.compile(r"auth|login|session|token|payment|billing|subscri|trade|order|broker|wallet|portfolio|alert", re.I)
 
@@ -26,8 +26,8 @@ def sh(cmd, cwd):
         return ""
 
 def last_code_sha(repo):
-    """Last commit touching product code (KB commits under superdev/ excluded)."""
-    return sh(["git", "log", "-1", "--format=%h", "--", ".", ":(exclude)superdev"],
+    """Last commit touching product code (KB commits under .speccraft/ excluded)."""
+    return sh(["git", "log", "-1", "--format=%h", "--", ".", ":(exclude).speccraft"],
               repo).strip() or "no-git"
 
 def snapshot(repo, sha, dest):
@@ -141,7 +141,7 @@ def main():
     # ---- churn (real repo dir, pinned to the same sha, KB excluded) ----
     churn = defaultdict(lambda: [0, 0])   # path -> [commits, lines]
     log = sh(["git", "log", sha, "--numstat", "--format=%h",
-              "--", ".", ":(exclude)superdev"], repo) if sha != "no-git" else ""
+              "--", ".", ":(exclude).speccraft"], repo) if sha != "no-git" else ""
     for ln in log.splitlines():
         m = re.match(r"^(\d+)\t(\d+)\t(.+)$", ln)
         if m and not any(s in m.group(3) for s in SKIP_DIRS):

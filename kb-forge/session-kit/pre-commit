@@ -5,24 +5,24 @@
 # Works for commits from ANY tool: Claude Code, Codex, OpenCode, or a human.
 [ -n "$KB_SHIPLOOP" ] && exit 0
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
-KB="$ROOT/superdev"
-FORGE="${KBFORGE_HOME:-$HOME/superdev/kb-forge}"
+KB="$ROOT/.speccraft"
+FORGE="${KBFORGE_HOME:-$HOME/.speccraft/kb-forge}"
 . "$FORGE/session-kit/evals/telemetry-lib.sh" 2>/dev/null || kb_telemetry(){ :; }
 if [ -n "$KB_RATIFY" ]; then
-  git diff --cached --name-only | grep -qE '^superdev/(kb/normative/|ledger/)' \
+  git diff --cached --name-only | grep -qE '^.speccraft/(kb/normative/|ledger/)' \
     && kb_telemetry ratify_used
   exit 0
 fi
 git rev-parse --verify HEAD >/dev/null 2>&1 || exit 0   # initial commit: skip
 
-BLOCKED=$(git diff --cached --name-only | grep -E '^superdev/(kb/normative/|kb/derived/|ledger/)' )
+BLOCKED=$(git diff --cached --name-only | grep -E '^.speccraft/(kb/normative/|kb/derived/|ledger/)' )
 [ -z "$BLOCKED" ] && exit 0
 kb_telemetry guard_commit_block
 
 echo "KB lane guard: these staged paths are founder/machine lanes:" >&2
 echo "$BLOCKED" | sed 's/^/  /' >&2
 echo "" >&2
-echo "Agents: unstage them and propose the change via superdev/QUEUE.md" >&2
-echo "        (superdev-diverge procedure). Ratification is human-only." >&2
+echo "Agents: unstage them and propose the change via .speccraft/QUEUE.md" >&2
+echo "        (speccraft-diverge procedure). Ratification is human-only." >&2
 echo "Founder ratifying deliberately:  KB_RATIFY=1 git commit ..." >&2
 exit 1

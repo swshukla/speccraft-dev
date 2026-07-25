@@ -1,14 +1,14 @@
 #!/bin/bash
 # Tier 1 evals report — rates over window, telemetry GC, health snippet,
 # breach finding. Never blocks anything; exit 0 unless bad args.
-# Usage: telemetry-report.sh [--kb <superdev-dir>] [--window N] [--retention N]
+# Usage: telemetry-report.sh [--kb <.speccraft-dir>] [--window N] [--retention N]
 set -u
 KB=""; WINDOW=""; RET=""
 while [ $# -gt 0 ]; do case "$1" in
   --kb) KB=$2; shift 2;; --window) WINDOW=$2; shift 2;;
   --retention) RET=$2; shift 2;; *) echo "unknown arg: $1" >&2; exit 2;;
 esac; done
-[ -n "$KB" ] || KB="$(git rev-parse --show-toplevel 2>/dev/null)/superdev"
+[ -n "$KB" ] || KB="$(git rev-parse --show-toplevel 2>/dev/null)/.speccraft"
 F="$KB/evals/telemetry.jsonl"
 [ -f "$F" ] || exit 0
 cfgval(){ awk -v k="$1:" '$1==k {print $2; exit}' "$KB/kbforge.yaml" 2>/dev/null; }
@@ -51,7 +51,7 @@ if [ "${DEN:-0}" -ge 5 ] && awk "BEGIN{exit !($NUM/$DEN < $MINR)}"; then
 # Finding: KB recall rate below threshold
 - window: last ${WINDOW}d | recall sessions: ${NUM}/${DEN} (< ${MINR})
 - meaning: the loop is not engaged; Tier 2/3 eval results are unattributable.
-- source: evals telemetry ($(date +%F)); see superdev/evals/telemetry.jsonl
+- source: evals telemetry ($(date +%F)); see .speccraft/evals/telemetry.jsonl
 EOF
 fi
 exit 0

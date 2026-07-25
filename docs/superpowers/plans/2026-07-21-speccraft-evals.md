@@ -1,8 +1,8 @@
-# superdev Evals Implementation Plan
+# Speccraft Evals Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the three-tier eval pyramid (compliance telemetry, KB truth audit, behavioral suite) for the kb-forge/superdev system, plus a seeded-defect self-test, per the approved spec at `docs/superpowers/specs/2026-07-21-superdev-evals-design.md`.
+**Goal:** Build the three-tier eval pyramid (compliance telemetry, KB truth audit, behavioral suite) for the kb-forge/speccraft system, plus a seeded-defect self-test, per the approved spec at `docs/superpowers/specs/2026-07-21-speccraft-evals-design.md`.
 
 **Architecture:** Deterministic bash scripts living canonically in `kb-forge/session-kit/evals/` and *run from the kit* (`$FORGE/session-kit/evals/...`), exactly like `recall.py` and the hooks — NOT copied per-repo. (Deliberate deviation from the spec's "install.sh gains an evals/ copy step": run-from-kit keeps one canonical source, which is the system's own core principle. install.sh instead ensures per-repo state: gitignore entry, `evals:` config block, reports dir.) Existing hooks each gain one fire-and-forget telemetry call. One capped `claude -p` judge pass handles semantic checks; it only flags, never edits the KB.
 
@@ -17,32 +17,32 @@
 - Defaults (all overridable in `kbforge.yaml` under `evals:`): `report_window_days: 14`, `telemetry_retention_days: 90`, `min_recall_rate: 0.70`, `min_precision: 0.80`, `judge_sample_size: 20`. Size backstop constants: 5 MB / keep newest 10,000 lines. Breach findings require ≥5 sessions (telemetry) / ≥5 sampled claims (audit) in window to avoid small-N noise.
 - Telemetry JSONL schema (one object per line, `detail` values must contain no double quotes): `{"ts":"<UTC ISO8601>","session":"<id>","event":"<name>","detail":"<free text>"}`.
 - Legal `status:` values: `ratified`, `ratified-partial`, `observed`, `pending-ratification`, `challenged`.
-- All kit work happens in `/Users/swapnil/superdev` (becomes a git repo in Task 1). Commit after every task.
+- All kit work happens in `/Users/swapnil/.speccraft` (becomes a git repo in Task 1). Commit after every task.
 
 ---
 
 ### Task 1: Init the kit git repo
 
-The kit at `/Users/swapnil/superdev` has no version control; the plan's per-task commits need one. User approved initializing it.
+The kit at `/Users/swapnil/.speccraft` has no version control; the plan's per-task commits need one. User approved initializing it.
 
 **Files:**
-- Create: `/Users/swapnil/superdev/.gitignore`
+- Create: `/Users/swapnil/.speccraft/.gitignore`
 
 - [ ] **Step 1: Init and first commit**
 
 ```bash
-cd /Users/swapnil/superdev
+cd /Users/swapnil/.speccraft
 git init
 printf '%s\n' '.DS_Store' '__pycache__/' '*.pyc' > .gitignore
 git add .gitignore kb-forge docs
-git commit -m "chore: init superdev kit repo (kb-forge, docs, specs)"
+git commit -m "chore: init .speccraft kit repo (kb-forge, docs, specs)"
 ```
 
 Note: `git add kb-forge docs` deliberately — do NOT `git add -A`; `invest4value/` and `whiteboard-notes.md` stay untracked until the user decides.
 
 - [ ] **Step 2: Verify**
 
-Run: `git -C /Users/swapnil/superdev log --oneline`
+Run: `git -C /Users/swapnil/.speccraft log --oneline`
 Expected: one commit; `git status` shows `invest4value/`, `whiteboard-notes.md` untracked, nothing staged.
 
 ---
@@ -54,7 +54,7 @@ Expected: one commit; `git status` shows `invest4value/`, `whiteboard-notes.md` 
 - Create: `kb-forge/session-kit/evals/self-test.sh`
 
 **Interfaces:**
-- Produces: `kb_telemetry <event> [detail]` — POSIX-sh function; requires env `$KB` (path to a `superdev/` dir); optional env `$KB_SESSION_ID` (default `nosession`); appends to `$KB/evals/telemetry.jsonl`; always returns 0.
+- Produces: `kb_telemetry <event> [detail]` — POSIX-sh function; requires env `$KB` (path to a `.speccraft/` dir); optional env `$KB_SESSION_ID` (default `nosession`); appends to `$KB/evals/telemetry.jsonl`; always returns 0.
 - Produces: `self-test.sh [section]` — runs all sections (or one: `lib|report|hooks|audit|judge|behavioral`); exits 0 iff all assertions pass; prints `self-test: N passed, M failed`.
 
 - [ ] **Step 1: Write self-test harness with the `lib` section (failing)**
@@ -77,7 +77,7 @@ run_section(){ [ "$ONLY" = all ] || [ "$ONLY" = "$1" ]; }
 
 # ---------- section: lib ----------
 if run_section lib; then
-  T=$(mktemp -d); export KB="$T/superdev"; mkdir -p "$KB"
+  T=$(mktemp -d); export KB="$T/.speccraft"; mkdir -p "$KB"
   . "$HERE/telemetry-lib.sh"
   KB_SESSION_ID=sess1 kb_telemetry recall_ran "src/app.py"
   OUT=$(cat "$KB/evals/telemetry.jsonl" 2>/dev/null)
@@ -109,7 +109,7 @@ Expected: FAIL (telemetry-lib.sh does not exist — source error / assertion fai
 #!/bin/sh
 # kb-forge evals — telemetry append helper. POSIX sh: sourced by bash session
 # hooks AND sh git hooks. Fire-and-forget: nothing here may fail the caller.
-# Contract: kb_telemetry <event> [detail]. Needs $KB (superdev/ dir); optional
+# Contract: kb_telemetry <event> [detail]. Needs $KB (.speccraft/ dir); optional
 # $KB_SESSION_ID. detail must not contain double quotes.
 kb_telemetry() {
   [ -n "${KB:-}" ] || return 0
@@ -134,7 +134,7 @@ Expected: `self-test: 6 passed, 0 failed`, exit 0.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/swapnil/superdev
+cd /Users/swapnil/.speccraft
 git add kb-forge/session-kit/evals
 git commit -m "feat(evals): telemetry append helper + self-test harness"
 ```
@@ -175,7 +175,7 @@ Add to `self-test.sh` before the final `echo` line:
 ```bash
 # ---------- section: report ----------
 if run_section report; then
-  T=$(mktemp -d); KB="$T/superdev"; mkdir -p "$KB/evals" "$KB/findings"
+  T=$(mktemp -d); KB="$T/.speccraft"; mkdir -p "$KB/evals" "$KB/findings"
   NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   sed "s/REPLACETS/$NOW/" "$HERE/fixtures/telemetry.jsonl" > "$KB/evals/telemetry.jsonl"
   printf -- '- last audit: none\n' > /dev/null # (health starts absent)
@@ -207,14 +207,14 @@ Run: `kb-forge/session-kit/evals/self-test.sh report` — Expected: FAIL (script
 #!/bin/bash
 # Tier 1 evals report — rates over window, telemetry GC, health snippet,
 # breach finding. Never blocks anything; exit 0 unless bad args.
-# Usage: telemetry-report.sh [--kb <superdev-dir>] [--window N] [--retention N]
+# Usage: telemetry-report.sh [--kb <.speccraft-dir>] [--window N] [--retention N]
 set -u
 KB=""; WINDOW=""; RET=""
 while [ $# -gt 0 ]; do case "$1" in
   --kb) KB=$2; shift 2;; --window) WINDOW=$2; shift 2;;
   --retention) RET=$2; shift 2;; *) echo "unknown arg: $1" >&2; exit 2;;
 esac; done
-[ -n "$KB" ] || KB="$(git rev-parse --show-toplevel 2>/dev/null)/superdev"
+[ -n "$KB" ] || KB="$(git rev-parse --show-toplevel 2>/dev/null)/.speccraft"
 F="$KB/evals/telemetry.jsonl"
 [ -f "$F" ] || exit 0
 cfgval(){ awk -v k="$1:" '$1==k {print $2; exit}' "$KB/kbforge.yaml" 2>/dev/null; }
@@ -257,7 +257,7 @@ if [ "${DEN:-0}" -ge 5 ] && awk "BEGIN{exit !($NUM/$DEN < $MINR)}"; then
 # Finding: KB recall rate below threshold
 - window: last ${WINDOW}d | recall sessions: ${NUM}/${DEN} (< ${MINR})
 - meaning: the loop is not engaged; Tier 2/3 eval results are unattributable.
-- source: evals telemetry ($(date +%F)); see superdev/evals/telemetry.jsonl
+- source: evals telemetry ($(date +%F)); see .speccraft/evals/telemetry.jsonl
 EOF
 fi
 exit 0
@@ -271,7 +271,7 @@ Expected: `self-test: 9 passed, 0 failed` (report section alone). Then run full:
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/swapnil/superdev
+cd /Users/swapnil/.speccraft
 git add kb-forge/session-kit/evals
 git commit -m "feat(evals): tier-1 telemetry report with GC, health snippet, breach finding"
 ```
@@ -353,10 +353,10 @@ kb_telemetry recall_ran "$REL"
 
 - [ ] **Step 4: Edit `kb-guard.sh`**
 
-After line 6 (`KB=$ROOT/superdev`), insert:
+After line 6 (`KB=$ROOT/.speccraft`), insert:
 
 ```bash
-FORGE="${KBFORGE_HOME:-$HOME/superdev/kb-forge}"
+FORGE="${KBFORGE_HOME:-$HOME/.speccraft/kb-forge}"
 . "$FORGE/session-kit/evals/telemetry-lib.sh" 2>/dev/null || kb_telemetry(){ :; }
 ```
 
@@ -389,11 +389,11 @@ Replace lines 6–7 (`[ -n "$KB_SHIPLOOP" ] && exit 0` / `[ -n "$KB_RATIFY" ] &&
 ```sh
 [ -n "$KB_SHIPLOOP" ] && exit 0
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
-KB="$ROOT/superdev"
-FORGE="${KBFORGE_HOME:-$HOME/superdev/kb-forge}"
+KB="$ROOT/.speccraft"
+FORGE="${KBFORGE_HOME:-$HOME/.speccraft/kb-forge}"
 . "$FORGE/session-kit/evals/telemetry-lib.sh" 2>/dev/null || kb_telemetry(){ :; }
 if [ -n "$KB_RATIFY" ]; then
-  git diff --cached --name-only | grep -qE '^superdev/(kb/normative/|ledger/)' \
+  git diff --cached --name-only | grep -qE '^.speccraft/(kb/normative/|ledger/)' \
     && kb_telemetry ratify_used
   exit 0
 fi
@@ -413,7 +413,7 @@ Expected: `self-test: 15 passed, 0 failed` (hooks section). Full run: `kb-forge/
 - [ ] **Step 8: Commit**
 
 ```bash
-cd /Users/swapnil/superdev
+cd /Users/swapnil/.speccraft
 git add kb-forge/session-kit
 git commit -m "feat(evals): wire tier-1 telemetry into session + git hooks"
 ```
@@ -426,7 +426,7 @@ git commit -m "feat(evals): wire tier-1 telemetry into session + git hooks"
 - Modify: `kb-forge/session-kit/install.sh` (after the skills block, before section 3b)
 
 **Interfaces:**
-- Produces (per repo): `.gitignore` entry `superdev/evals/telemetry.jsonl`; `evals:` block appended to `superdev/kbforge.yaml` if absent; `superdev/evals/reports/` dir with `.gitkeep`.
+- Produces (per repo): `.gitignore` entry `.speccraft/evals/telemetry.jsonl`; `evals:` block appended to `.speccraft/kbforge.yaml` if absent; `.speccraft/evals/reports/` dir with `.gitkeep`.
 
 - [ ] **Step 1: Add the evals section to install.sh**
 
@@ -434,12 +434,12 @@ Insert after the opencode-commands copy (line 44):
 
 ```bash
 # 3c. Evals (tier-1 telemetry + audits run FROM the kit; repo only needs state)
-grep -qx 'superdev/evals/telemetry.jsonl' "$REPO/.gitignore" 2>/dev/null \
-  || echo 'superdev/evals/telemetry.jsonl' >> "$REPO/.gitignore"
-mkdir -p "$REPO/superdev/evals/reports"
-touch "$REPO/superdev/evals/reports/.gitkeep"
-if ! grep -q '^evals:' "$REPO/superdev/kbforge.yaml"; then
-  cat >> "$REPO/superdev/kbforge.yaml" <<'EOF'
+grep -qx '.speccraft/evals/telemetry.jsonl' "$REPO/.gitignore" 2>/dev/null \
+  || echo '.speccraft/evals/telemetry.jsonl' >> "$REPO/.gitignore"
+mkdir -p "$REPO/.speccraft/evals/reports"
+touch "$REPO/.speccraft/evals/reports/.gitkeep"
+if ! grep -q '^evals:' "$REPO/.speccraft/kbforge.yaml"; then
+  cat >> "$REPO/.speccraft/kbforge.yaml" <<'EOF'
 evals:
   report_window_days: 14
   telemetry_retention_days: 90
@@ -457,12 +457,12 @@ Note: the flat `cfgval` parser (`awk '$1==k'`) finds the indented `report_window
 
 ```bash
 D=$(mktemp -d); cd "$D" && git init -q
-mkdir -p superdev && printf 'repo: x\nproduct: x\n' > superdev/kbforge.yaml
-bash /Users/swapnil/superdev/kb-forge/session-kit/install.sh "$D"
-bash /Users/swapnil/superdev/kb-forge/session-kit/install.sh "$D"
+mkdir -p .speccraft && printf 'repo: x\nproduct: x\n' > .speccraft/kbforge.yaml
+bash /Users/swapnil/.speccraft/kb-forge/session-kit/install.sh "$D"
+bash /Users/swapnil/.speccraft/kb-forge/session-kit/install.sh "$D"
 grep -c 'telemetry.jsonl' .gitignore        # expect: 1 (not 2)
-grep -c '^evals:' superdev/kbforge.yaml     # expect: 1
-ls superdev/evals/reports/.gitkeep          # expect: exists
+grep -c '^evals:' .speccraft/kbforge.yaml     # expect: 1
+ls .speccraft/evals/reports/.gitkeep          # expect: exists
 ```
 
 Expected: counts are 1 and 1 after running twice; cleanup `rm -rf "$D"`.
@@ -470,7 +470,7 @@ Expected: counts are 1 and 1 after running twice; cleanup `rm -rf "$D"`.
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/swapnil/superdev
+cd /Users/swapnil/.speccraft
 git add kb-forge/session-kit/install.sh
 git commit -m "feat(evals): install.sh ensures per-repo evals state (idempotent)"
 ```
@@ -481,8 +481,8 @@ git commit -m "feat(evals): install.sh ensures per-repo evals state (idempotent)
 
 **Files:**
 - Create: `kb-forge/session-kit/evals/kb-audit.sh`
-- Create: `kb-forge/session-kit/evals/fixtures/kb-clean/superdev/...` (see Step 1)
-- Create: `kb-forge/session-kit/evals/fixtures/kb-defects/superdev/...` (see Step 1)
+- Create: `kb-forge/session-kit/evals/fixtures/kb-clean/.speccraft/...` (see Step 1)
+- Create: `kb-forge/session-kit/evals/fixtures/kb-defects/.speccraft/...` (see Step 1)
 - Modify: `kb-forge/session-kit/evals/self-test.sh` (add `audit` section + `mk_repo` helper)
 
 **Interfaces:**
@@ -491,7 +491,7 @@ git commit -m "feat(evals): install.sh ensures per-repo evals state (idempotent)
 
 - [ ] **Step 1: Create fixtures + failing `audit` self-test section**
 
-`fixtures/kb-clean/superdev/kb/normative/00-product-intent.md`:
+`fixtures/kb-clean/.speccraft/kb/normative/00-product-intent.md`:
 
 ```markdown
 ---
@@ -502,7 +502,7 @@ anchors: [product-intent, src/app.py]
 - Identity: a demo product for eval fixtures. (elicited)
 ```
 
-`fixtures/kb-clean/superdev/kb/normative/01-invariants.md`:
+`fixtures/kb-clean/.speccraft/kb/normative/01-invariants.md`:
 
 ```markdown
 ---
@@ -514,7 +514,7 @@ anchors: [invariants, src/app.py]
 ## INV-2 All prices come from one canonical source. (elicited)
 ```
 
-`fixtures/kb-clean/superdev/kb/inferred/03-pm-strategy.md`:
+`fixtures/kb-clean/.speccraft/kb/inferred/03-pm-strategy.md`:
 
 ```markdown
 ---
@@ -525,16 +525,16 @@ anchors: [pm-strategy, src/app.py]
 - The app targets retail users. (documented)
 ```
 
-`fixtures/kb-clean/superdev/kb/derived/inventory.md`:
+`fixtures/kb-clean/.speccraft/kb/derived/inventory.md`:
 
 ```markdown
 source_commit: __COMMIT__
 - src/app.py — the app
 ```
 
-Also create empty `fixtures/kb-clean/superdev/QUEUE.md` containing `# Queue` and a `fixtures/kb-clean/superdev/kbforge.yaml` containing `product: fixture`.
+Also create empty `fixtures/kb-clean/.speccraft/QUEUE.md` containing `# Queue` and a `fixtures/kb-clean/.speccraft/kbforge.yaml` containing `product: fixture`.
 
-`fixtures/kb-defects/superdev/` — same structure with four planted defects:
+`fixtures/kb-defects/.speccraft/` — same structure with four planted defects:
 - `kb/normative/00-product-intent.md`: `anchors: [product-intent, src/gone.py]` (dead anchor) and `status: verified` (illegal).
 - `kb/normative/01-invariants.md`: two `## INV-1` headings (duplicate id) and NO `elicited_by`/`documented_by` in frontmatter (missing provenance).
 - `kb/inferred/03-pm-strategy.md`: `documented_by: doc:docs/MISSING.md@__COMMIT__` (dead doc path).
@@ -543,13 +543,13 @@ Also create empty `fixtures/kb-clean/superdev/QUEUE.md` containing `# Queue` and
 Add to `self-test.sh` after the assert helpers:
 
 ```bash
-mk_repo(){ # $1 = fixture superdev parent dir; echoes new repo path
+mk_repo(){ # $1 = fixture .speccraft parent dir; echoes new repo path
   local R; R=$(mktemp -d)
   ( cd "$R" && git init -q \
     && mkdir -p src docs && echo 'app' > src/app.py && echo 'ov' > docs/OVERVIEW.md \
-    && cp -R "$1"/superdev . && git add -A && git commit -qm init \
+    && cp -R "$1"/.speccraft . && git add -A && git commit -qm init \
     && C=$(git rev-parse --short HEAD) \
-    && grep -rl '__COMMIT__' superdev | while read -r f; do sed -i '' "s/__COMMIT__/$C/g" "$f"; done \
+    && grep -rl '__COMMIT__' .speccraft | while read -r f; do sed -i '' "s/__COMMIT__/$C/g" "$f"; done \
     && git add -A && git commit -qm pin ) >/dev/null 2>&1
   echo "$R"
 }
@@ -561,11 +561,11 @@ And the section (before final echo):
 # ---------- section: audit ----------
 if run_section audit; then
   RC=$(mk_repo "$HERE/fixtures/kb-clean")
-  OUT=$("$HERE/kb-audit.sh" --root "$RC" --kb "$RC/superdev")
+  OUT=$("$HERE/kb-audit.sh" --root "$RC" --kb "$RC/.speccraft")
   assert_contains "$OUT" 'AUDIT: 0 issues' "audit: clean fixture passes"
-  ls "$RC/superdev/evals/reports/" | grep -q audit.md && ok || no "audit: report written"
+  ls "$RC/.speccraft/evals/reports/" | grep -q audit.md && ok || no "audit: report written"
   RD=$(mk_repo "$HERE/fixtures/kb-defects")
-  OUT=$("$HERE/kb-audit.sh" --root "$RD" --kb "$RD/superdev")
+  OUT=$("$HERE/kb-audit.sh" --root "$RD" --kb "$RD/.speccraft")
   assert_contains "$OUT" 'anchor-rot: .*src/gone.py' "audit: catches dead anchor"
   assert_contains "$OUT" "illegal status 'verified'" "audit: catches illegal status"
   assert_contains "$OUT" 'duplicate invariant ids: INV-1' "audit: catches dup INV"
@@ -584,7 +584,7 @@ Run: `kb-forge/session-kit/evals/self-test.sh audit` — Expected: FAIL (script 
 #!/bin/bash
 # Tier 2 KB truth audit. Mechanical checks always run (deterministic);
 # --judge adds one capped LLM pass (Task 7). Judge flags, never edits.
-# Usage: kb-audit.sh [--kb <superdev-dir>] [--root <repo-root>] [--judge]
+# Usage: kb-audit.sh [--kb <.speccraft-dir>] [--root <repo-root>] [--judge]
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 KB=""; ROOT=""; JUDGE=0
@@ -593,7 +593,7 @@ while [ $# -gt 0 ]; do case "$1" in
   *) echo "unknown arg: $1" >&2; exit 2;;
 esac; done
 [ -n "$ROOT" ] || ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-[ -n "$KB" ] || KB="$ROOT/superdev"
+[ -n "$KB" ] || KB="$ROOT/.speccraft"
 [ -d "$KB/kb" ] || exit 0
 LEGAL='ratified|ratified-partial|observed|pending-ratification|challenged'
 ISSUES=(); note(){ ISSUES+=("$1"); }
@@ -665,7 +665,7 @@ Expected: `self-test: 8 passed, 0 failed` (audit section). Full run → 38 passe
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/swapnil/superdev
+cd /Users/swapnil/.speccraft
 git add kb-forge/session-kit/evals
 git commit -m "feat(evals): tier-2 mechanical KB audit with seeded-defect fixtures"
 ```
@@ -720,9 +720,9 @@ Output: a single JSON array, no prose, no markdown fence:
 # Self-test stub for the claude CLI: swallows args/stdin, emits canned verdicts.
 cat > /dev/null 2>&1 || true
 cat <<'EOF'
-[{"claim":"The app targets retail users. (documented)","file":"superdev/kb/inferred/03-pm-strategy.md","verdict":"SUPPORTED","evidence":"src/app.py:1 — app"},
- {"claim":"INV-1 The fixture ledger is append-only. (elicited)","file":"superdev/kb/normative/01-invariants.md","verdict":"POSSIBLY_STALE","evidence":"not visible in context"},
- {"claim":"INV-2 All prices come from one canonical source. (elicited)","file":"superdev/kb/normative/01-invariants.md","verdict":"CONTRADICTED","evidence":"src/app.py:1 — second source"}]
+[{"claim":"The app targets retail users. (documented)","file":".speccraft/kb/inferred/03-pm-strategy.md","verdict":"SUPPORTED","evidence":"src/app.py:1 — app"},
+ {"claim":"INV-1 The fixture ledger is append-only. (elicited)","file":".speccraft/kb/normative/01-invariants.md","verdict":"POSSIBLY_STALE","evidence":"not visible in context"},
+ {"claim":"INV-2 All prices come from one canonical source. (elicited)","file":".speccraft/kb/normative/01-invariants.md","verdict":"CONTRADICTED","evidence":"src/app.py:1 — second source"}]
 EOF
 ```
 
@@ -733,22 +733,22 @@ Self-test section (before final echo):
 if run_section judge; then
   RC=$(mk_repo "$HERE/fixtures/kb-clean")
   chmod +x "$HERE/fixtures/bin/claude"
-  OUT=$(PATH="$HERE/fixtures/bin:$PATH" "$HERE/kb-audit.sh" --root "$RC" --kb "$RC/superdev" --judge)
-  R=$(cat "$RC"/superdev/evals/reports/*-audit.md)
+  OUT=$(PATH="$HERE/fixtures/bin:$PATH" "$HERE/kb-audit.sh" --root "$RC" --kb "$RC/.speccraft" --judge)
+  R=$(cat "$RC"/.speccraft/evals/reports/*-audit.md)
   assert_contains "$R" 'SUPPORTED' "judge: verdicts in report"
   assert_contains "$R" 'precision 0.33' "judge: precision computed (1/3)"
-  Q=$(cat "$RC/superdev/QUEUE.md")
+  Q=$(cat "$RC/.speccraft/QUEUE.md")
   assert_contains "$Q" 'CONTRADICTED.*INV-2' "judge: contradiction queued"
   assert_contains "$Q" 'POSSIBLY_STALE.*INV-1' "judge: stale queued"
   assert_not_contains "$Q" 'retail users' "judge: SUPPORTED not queued"
-  grep -q 'last audit: .*precision 0.33' "$RC/superdev/evals/health.md" \
+  grep -q 'last audit: .*precision 0.33' "$RC/.speccraft/evals/health.md" \
     && ok || no "judge: health line upserted"
   # elicited intent files are never sampled as claims (only INVs get the compliance pass)
   assert_not_contains "$R" 'Identity: a demo product' "judge: elicited claims not judged"
   # no claude on PATH -> semantic SKIPPED, still exit 0
   RC2=$(mk_repo "$HERE/fixtures/kb-clean")
-  OUT2=$(PATH=/usr/bin:/bin "$HERE/kb-audit.sh" --root "$RC2" --kb "$RC2/superdev" --judge)
-  grep -q 'SKIPPED' "$RC2"/superdev/evals/reports/*-audit.md && ok || no "judge: skips without claude"
+  OUT2=$(PATH=/usr/bin:/bin "$HERE/kb-audit.sh" --root "$RC2" --kb "$RC2/.speccraft" --judge)
+  grep -q 'SKIPPED' "$RC2"/.speccraft/evals/reports/*-audit.md && ok || no "judge: skips without claude"
   rm -rf "$RC" "$RC2"
 fi
 ```
@@ -784,7 +784,7 @@ if [ "$JUDGE" -eq 1 ]; then
     # invariant compliance pass (always included)
     while read -r inv; do
       [ -z "$inv" ] && continue
-      CLAIMS+="- claim: ${inv#\#\# } | file: superdev/kb/normative/01-invariants.md"$'\n'
+      CLAIMS+="- claim: ${inv#\#\# } | file: .speccraft/kb/normative/01-invariants.md"$'\n'
     done <<<"$(grep -E '^#+ *INV-' "$KB/kb/normative/01-invariants.md" 2>/dev/null)"
     NSAMP=$(grep -c '^- claim' <<<"$CLAIMS")
     # code context: head of every anchored path referenced by sampled files
@@ -818,8 +818,8 @@ if [ "$JUDGE" -eq 1 ]; then
         [ -f "$FD" ] || cat > "$FD" <<EOF
 # Finding: KB claim precision below threshold
 - audit $(date +%F): precision $PRECISION over $NT sampled claims (< $MINP)
-- non-SUPPORTED verdicts were appended to superdev/QUEUE.md — adjudicate via
-  superdev-diverge (CONTRADICTED) / superdev-ratify (confirm) / dismiss.
+- non-SUPPORTED verdicts were appended to .speccraft/QUEUE.md — adjudicate via
+  speccraft-diverge (CONTRADICTED) / speccraft-ratify (confirm) / dismiss.
 EOF
       fi
     else
@@ -854,7 +854,7 @@ Expected: `self-test: 8 passed, 0 failed` (judge section). Full run → 46 passe
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/swapnil/superdev
+cd /Users/swapnil/.speccraft
 git add kb-forge/session-kit/evals
 git commit -m "feat(evals): tier-2 semantic judge — rubric, sampling, verdict routing to QUEUE"
 ```
@@ -954,7 +954,7 @@ exit 0
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "not in a repo" >&2; exit 2; }
-KB="$ROOT/superdev"
+KB="$ROOT/.speccraft"
 TASKS="$KB/evals/behavioral-tasks.md"; ONLY=""
 while [ $# -gt 0 ]; do case "$1" in
   --tasks) TASKS=$2; shift 2;; --only) ONLY=$2; shift 2;;
@@ -980,7 +980,7 @@ for B in "$OUTDIR"/task-*.block; do
     WT="$OUTDIR/wt-$ID-$MODE"
     git -C "$ROOT" worktree add -q "$WT" HEAD
     if [ "$MODE" = blind ]; then
-      rm -rf "$WT/superdev" "$WT/.claude" "$WT/.agents" "$WT/.opencode" "$WT/AGENTS.md"
+      rm -rf "$WT/.speccraft" "$WT/.claude" "$WT/.agents" "$WT/.opencode" "$WT/AGENTS.md"
     fi
     ( cd "$WT" && claude -p "$PROMPT" --permission-mode acceptEdits \
         --output-format text > "$OUTDIR/$ID-$MODE.txt" 2>&1 ) || true
@@ -1012,7 +1012,7 @@ echo "report: $REPORT (transcripts kept in $OUTDIR until reboot — grade, then 
 
 Each task is a TEMPTATION: a realistic request whose easiest implementation
 violates an invariant, reinvents an existing capability, or contradicts
-stated intent. 5–8 tasks per repo, kept in superdev/evals/behavioral-tasks.md.
+stated intent. 5–8 tasks per repo, kept in .speccraft/evals/behavioral-tasks.md.
 
 Coverage checklist: one task per high-stakes INV-N; 1–2 reuse traps (data or
 capability already in kb/inferred/05-data-sources.md / 06-integrations.md);
@@ -1042,7 +1042,7 @@ Expected: `self-test: 4 passed, 0 failed` (section). Full run → 50 passed, 0 f
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/swapnil/superdev
+cd /Users/swapnil/.speccraft
 git add kb-forge/session-kit/evals
 git commit -m "feat(evals): tier-3 behavioral suite — template, tripwire checker, paired runner"
 ```
@@ -1052,14 +1052,14 @@ git commit -m "feat(evals): tier-3 behavioral suite — template, tripwire check
 ### Task 9: Author stocktickerapp behavioral tasks
 
 **Files:**
-- Create: `/Users/swapnil/stocktickerapp/superdev/evals/behavioral-tasks.md`
+- Create: `/Users/swapnil/stocktickerapp/.speccraft/evals/behavioral-tasks.md`
 
 **Interfaces:**
 - Consumes: `tasks-template.md` format (Task 8); the repo's real invariants and inferred capability files.
 
 - [ ] **Step 1: Read the source material**
 
-Read `/Users/swapnil/stocktickerapp/superdev/kb/normative/01-invariants.md` (INV-1…INV-5), `00-product-intent.md`, `kb/inferred/05-data-sources.md`, `06-integrations.md`.
+Read `/Users/swapnil/stocktickerapp/.speccraft/kb/normative/01-invariants.md` (INV-1…INV-5), `00-product-intent.md`, `kb/inferred/05-data-sources.md`, `06-integrations.md`.
 
 - [ ] **Step 2: Author 5–8 tasks**
 
@@ -1067,57 +1067,57 @@ Write `behavioral-tasks.md` following the template exactly: one task per INV who
 
 - [ ] **Step 3: Validate parseability**
 
-Run: `bash /Users/swapnil/superdev/kb-forge/session-kit/evals/behavioral/run.sh --tasks /Users/swapnil/stocktickerapp/superdev/evals/behavioral-tasks.md --only TASK-99`
+Run: `bash /Users/swapnil/.speccraft/kb-forge/session-kit/evals/behavioral/run.sh --tasks /Users/swapnil/stocktickerapp/.speccraft/evals/behavioral-tasks.md --only TASK-99`
 Expected: runs to completion with no task matched (TASK-99 doesn't exist), proving the file parses; exit 0, empty report table.
 
 - [ ] **Step 4: Commit (stocktickerapp repo)**
 
 ```bash
 cd /Users/swapnil/stocktickerapp
-git add superdev/evals/behavioral-tasks.md
+git add .speccraft/evals/behavioral-tasks.md
 git commit -m "evals: behavioral task instances from ratified invariants"
 ```
 
-(`superdev/evals/` is not a guarded lane — pre-commit only blocks `kb/normative|kb/derived|ledger`.)
+(`.speccraft/evals/` is not a guarded lane — pre-commit only blocks `kb/normative|kb/derived|ledger`.)
 
 ---
 
-### Task 10: superdev-eval skill (front-end)
+### Task 10: speccraft-eval skill (front-end)
 
 **Files:**
-- Create: `kb-forge/session-kit/skills/superdev-eval/SKILL.md`
-- Create: `kb-forge/session-kit/opencode-commands/superdev-eval.md` (same body, opencode frontmatter style copied from `opencode-commands/superdev-recall.md`)
-- Create: `kb-forge/session-kit/codex-prompts/superdev-eval.md` (same body, style copied from `codex-prompts/superdev-recall.md`)
-- Modify: `kb-forge/session-kit/install.sh` line 37: add `superdev-eval` to the skills loop list.
+- Create: `kb-forge/session-kit/skills/speccraft-eval/SKILL.md`
+- Create: `kb-forge/session-kit/opencode-commands/speccraft-eval.md` (same body, opencode frontmatter style copied from `opencode-commands/speccraft-recall.md`)
+- Create: `kb-forge/session-kit/codex-prompts/speccraft-eval.md` (same body, style copied from `codex-prompts/speccraft-recall.md`)
+- Modify: `kb-forge/session-kit/install.sh` line 37: add `speccraft-eval` to the skills loop list.
 
 - [ ] **Step 1: Write SKILL.md**
 
 ```markdown
 ---
-name: superdev-eval
-description: Use to check whether the superdev KB system is actually working — loop engagement, KB truthfulness, and (per release) behavioral lift. Run weekly, before releases, or when trust in the KB is questioned. Reports and flags; never edits ratified truth.
+name: speccraft-eval
+description: Use to check whether the .speccraft KB system is actually working — loop engagement, KB truthfulness, and (per release) behavioral lift. Run weekly, before releases, or when trust in the KB is questioned. Reports and flags; never edits ratified truth.
 ---
 
-# superdev-eval — is the memory palace telling the truth?
+# speccraft-eval — is the memory palace telling the truth?
 
 You are a narrator over deterministic scripts. The scripts measure; you
 explain and route. Never edit kb/normative/, kb/derived/, or ledger/ —
-verdict resolution goes through superdev-ratify / superdev-diverge.
+verdict resolution goes through speccraft-ratify / speccraft-diverge.
 
-Let FORGE = ${KBFORGE_HOME:-~/superdev/kb-forge}.
+Let FORGE = ${KBFORGE_HOME:-~/.speccraft/kb-forge}.
 
 ## 1. Tier 1 — engagement
 Run: `$FORGE/session-kit/evals/telemetry-report.sh`
 Explain the rates in one paragraph. If recall coverage is low, say plainly:
 "the loop is not engaged — Tier 2/3 results are unattributable" and check
-superdev/findings/ for the breach entry.
+.speccraft/findings/ for the breach entry.
 
 ## 2. Tier 2 — KB truth
 Run: `$FORGE/session-kit/evals/kb-audit.sh --judge`
 (mechanical-only fallback if no API budget: omit --judge). Read the report it
 prints. Summarize: issue count, worst anchor-rot, precision. Then walk the
-NEW queue items it appended to superdev/QUEUE.md one at a time with the
-founder; for each: confirm (→ superdev-ratify), contest (→ superdev-diverge),
+NEW queue items it appended to .speccraft/QUEUE.md one at a time with the
+founder; for each: confirm (→ speccraft-ratify), contest (→ speccraft-diverge),
 or dismiss (strike through the queue line with a dated note).
 
 ## 3. Tier 3 — behavioral (per release, ask first)
@@ -1127,32 +1127,32 @@ Then grade the judgment calls from the transcripts per the report's checklist,
 and append your notes to the report file.
 
 ## 4. Close
-The health snippet (superdev/evals/health.md) now shows all three tiers and
+The health snippet (.speccraft/evals/health.md) now shows all three tiers and
 is embedded in KB-STATUS.md on the next ship loop. State the one-line health
 summary and the single most important follow-up.
 ```
 
 - [ ] **Step 2: Create the opencode + codex variants**
 
-Copy the body above into both files, adapting only the frontmatter/header to match the existing per-harness style (open `opencode-commands/superdev-recall.md` and `codex-prompts/superdev-recall.md` first and mirror their structure exactly).
+Copy the body above into both files, adapting only the frontmatter/header to match the existing per-harness style (open `opencode-commands/speccraft-recall.md` and `codex-prompts/speccraft-recall.md` first and mirror their structure exactly).
 
 - [ ] **Step 3: Update install.sh skills loop**
 
 Line 37, change to:
 
 ```bash
-for s in superdev-interview superdev-recall superdev-decide superdev-diverge superdev-ratify superdev-eval; do
+for s in speccraft-interview speccraft-recall speccraft-decide speccraft-diverge speccraft-ratify speccraft-eval; do
 ```
 
 - [ ] **Step 4: Verify + commit**
 
-Run: `bash -n kb-forge/session-kit/install.sh && ls kb-forge/session-kit/skills/superdev-eval/SKILL.md kb-forge/session-kit/opencode-commands/superdev-eval.md kb-forge/session-kit/codex-prompts/superdev-eval.md`
+Run: `bash -n kb-forge/session-kit/install.sh && ls kb-forge/session-kit/skills/speccraft-eval/SKILL.md kb-forge/session-kit/opencode-commands/speccraft-eval.md kb-forge/session-kit/codex-prompts/speccraft-eval.md`
 Expected: syntax OK, three files exist.
 
 ```bash
-cd /Users/swapnil/superdev
+cd /Users/swapnil/.speccraft
 git add kb-forge/session-kit
-git commit -m "feat(evals): superdev-eval front-end skill (all harnesses)"
+git commit -m "feat(evals): speccraft-eval front-end skill (all harnesses)"
 ```
 
 ---
@@ -1160,40 +1160,40 @@ git commit -m "feat(evals): superdev-eval front-end skill (all harnesses)"
 ### Task 11: Deploy to stocktickerapp + live smoke
 
 **Files:**
-- Modify (via install.sh): `/Users/swapnil/stocktickerapp/.gitignore`, `superdev/kbforge.yaml`, `.claude/skills/`, `.agents/skills/`, `.opencode/commands/`, `.git/hooks/pre-commit`, `~/.codex/prompts/`
+- Modify (via install.sh): `/Users/swapnil/stocktickerapp/.gitignore`, `.speccraft/kbforge.yaml`, `.claude/skills/`, `.agents/skills/`, `.opencode/commands/`, `.git/hooks/pre-commit`, `~/.codex/prompts/`
 
 - [ ] **Step 1: Run the installer**
 
-Run: `bash /Users/swapnil/superdev/kb-forge/session-kit/install.sh /Users/swapnil/stocktickerapp`
+Run: `bash /Users/swapnil/.speccraft/kb-forge/session-kit/install.sh /Users/swapnil/stocktickerapp`
 Expected output includes: `evals: gitignore + kbforge.yaml evals block + reports dir ensured` and the skills line; `pre-commit: installed`.
 
 - [ ] **Step 2: Live smoke — telemetry + report**
 
 ```bash
 cd /Users/swapnil/stocktickerapp
-export KB=$PWD/superdev
-sh -c '. /Users/swapnil/superdev/kb-forge/session-kit/evals/telemetry-lib.sh; KB_SESSION_ID=smoke kb_telemetry recall_ran "backend/app/main.py"; kb_telemetry kb_status "queue=14 ledger=3"'
-bash /Users/swapnil/superdev/kb-forge/session-kit/evals/telemetry-report.sh
-cat superdev/evals/health.md
-bash /Users/swapnil/superdev/kb-forge/session-kit/hooks/kb-status.sh && grep -A2 'evals telemetry' superdev/KB-STATUS.md
+export KB=$PWD/.speccraft
+sh -c '. /Users/swapnil/.speccraft/kb-forge/session-kit/evals/telemetry-lib.sh; KB_SESSION_ID=smoke kb_telemetry recall_ran "backend/app/main.py"; kb_telemetry kb_status "queue=14 ledger=3"'
+bash /Users/swapnil/.speccraft/kb-forge/session-kit/evals/telemetry-report.sh
+cat .speccraft/evals/health.md
+bash /Users/swapnil/.speccraft/kb-forge/session-kit/hooks/kb-status.sh && grep -A2 'evals telemetry' .speccraft/KB-STATUS.md
 ```
 
 Expected: report prints `recall 1/1 sessions`; health.md exists; KB-STATUS.md contains the health line.
 
 - [ ] **Step 3: Live smoke — mechanical audit on the real KB**
 
-Run: `bash /Users/swapnil/superdev/kb-forge/session-kit/evals/kb-audit.sh`
-Expected: `AUDIT: <n> issues` + report file under `superdev/evals/reports/`. Read the issues; they are REAL findings about the real KB — report them to the user verbatim in the task summary (do not fix the KB in this task).
+Run: `bash /Users/swapnil/.speccraft/kb-forge/session-kit/evals/kb-audit.sh`
+Expected: `AUDIT: <n> issues` + report file under `.speccraft/evals/reports/`. Read the issues; they are REAL findings about the real KB — report them to the user verbatim in the task summary (do not fix the KB in this task).
 
 - [ ] **Step 4: Commit both repos**
 
 ```bash
 cd /Users/swapnil/stocktickerapp
-git add .gitignore superdev/kbforge.yaml superdev/evals .claude/skills .agents/skills .opencode/commands
-git commit -m "evals: arm repo with superdev eval pyramid (tier-1 live, audit + behavioral on demand)"
+git add .gitignore .speccraft/kbforge.yaml .speccraft/evals .claude/skills .agents/skills .opencode/commands
+git commit -m "evals: arm repo with .speccraft eval pyramid (tier-1 live, audit + behavioral on demand)"
 ```
 
-Note: `superdev/KB-STATUS.md` is machine-lane; leave it for the ship loop to commit (`KB_SHIPLOOP=1`). If pre-commit blocks anything unexpected, report it — do not use `KB_RATIFY=1` yourself.
+Note: `.speccraft/KB-STATUS.md` is machine-lane; leave it for the ship loop to commit (`KB_SHIPLOOP=1`). If pre-commit blocks anything unexpected, report it — do not use `KB_RATIFY=1` yourself.
 
 ---
 

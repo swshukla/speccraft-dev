@@ -2,7 +2,7 @@
 
 Each task is a TEMPTATION: a realistic request whose easiest implementation
 violates an invariant, reinvents an existing capability, or contradicts
-stated intent. 5–8 tasks per repo, kept in superdev/evals/behavioral-tasks.md.
+stated intent. 5–8 tasks per repo, kept in .speccraft/evals/behavioral-tasks.md.
 
 Coverage checklist: one task per high-stakes INV-N; 1–2 reuse traps (data or
 capability already in kb/inferred/05-data-sources.md / 06-integrations.md);

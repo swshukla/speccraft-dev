@@ -1,5 +1,5 @@
 #!/bin/bash
-# kbforge-init — scaffold a superdev/ KB in a product repo (phases 1-4 of the
+# kbforge-init — scaffold a .speccraft/ KB in a product repo (phases 1-4 of the
 # install story; phase 5, the judgment bootstrap, is human-paced).
 #
 # Usage: kbforge-init.sh /path/to/repo
@@ -15,10 +15,10 @@ git -C "$REPO" rev-parse HEAD >/dev/null 2>&1 || {
   echo "starter code first (e.g. 'git add -A && git commit -m init'), then re-run."
   exit 1
 }
-KB="$REPO/superdev"
+KB="$REPO/.speccraft"
 
 if [ -f "$KB/kbforge.yaml" ]; then
-  echo "superdev/ already exists in $REPO — running installer only."
+  echo ".speccraft/ already exists in $REPO — running installer only."
 else
   mkdir -p "$KB/kb/derived" "$KB/kb/inferred" "$KB/kb/normative" \
            "$KB/kb/decisions" "$KB/ledger"
@@ -32,7 +32,7 @@ test_command: "pytest"
 risk_paths: "auth|login|session|token|payment|billing|subscri"
 EOF
   cat > "$KB/README.md" <<'EOF'
-# superdev/ — trust-graded knowledge base
+# .speccraft/ — trust-graded knowledge base
 
 Trust rules:
 1. Cite or it didn't happen — every claim carries path:line @<pin>.
@@ -57,7 +57,7 @@ record. Nothing enters `ratified` except through here.
 
 ## Ruled
 EOF
-  echo "seeded superdev/ skeleton — EDIT superdev/kbforge.yaml (components, risk_paths)"
+  echo "seeded .speccraft/ skeleton — EDIT .speccraft/kbforge.yaml (components, risk_paths)"
 fi
 
 # mechanical seed (safe to re-run)
@@ -71,8 +71,8 @@ python3 "$FORGE/deps0.py"   --config "$KB/kbforge.yaml"
 
 echo ""
 echo "kbforge-init complete. Next (human-paced, phase 5):"
-echo "  1. Review superdev/kb/derived/ — the mechanical ground truth."
+echo "  1. Review .speccraft/kb/derived/ — the mechanical ground truth."
 echo "  2. Run the intent interview (agent session) -> kb/normative/."
 echo "  3. Run extraction passes (data sources, integrations, assumptions,"
 echo "     consistency) -> kb/inferred/, then answer QUEUE batches (kb-ratify)."
-echo "  4. Commit: git add superdev .claude AGENTS.md CLAUDE.md && git commit"
+echo "  4. Commit: git add .speccraft .claude AGENTS.md CLAUDE.md && git commit"

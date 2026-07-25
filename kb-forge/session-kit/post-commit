@@ -1,14 +1,14 @@
 #!/bin/sh
 # kb-forge post-commit — write-back-on-ship (ship loop). Repo-relative:
-# works in any repo with a superdev/ KB. ORDER MATTERS: drift runs against
+# works in any repo with a .speccraft/ KB. ORDER MATTERS: drift runs against
 # the OLD pin before seed0 re-pins.
 #
-# Guards: commits touching only superdev/ never re-trigger (kills recursion
+# Guards: commits touching only .speccraft/ never re-trigger (kills recursion
 # from the loop's own kb: commit); linked-worktree commits skipped; lockfile
 # collapses rapid commit bursts into one run.
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-KBCFG=$ROOT/superdev/kbforge.yaml
-FORGE="${KBFORGE_HOME:-$HOME/superdev/kb-forge}"
+KBCFG=$ROOT/.speccraft/kbforge.yaml
+FORGE="${KBFORGE_HOME:-$HOME/.speccraft/kb-forge}"
 [ -f "$KBCFG" ] || exit 0
 LOG="${TMPDIR:-/tmp}/kb-shiploop.log"
 LOCK="${TMPDIR:-/tmp}/kb-shiploop-$(basename "$ROOT").lock"
@@ -16,8 +16,8 @@ LOCK="${TMPDIR:-/tmp}/kb-shiploop-$(basename "$ROOT").lock"
 # in a linked worktree, --git-dir differs from --git-common-dir: skip
 [ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ] && exit 0
 
-# commit touched only superdev/ (or nothing): skip — prevents self-trigger
-git diff-tree --no-commit-id --name-only -r HEAD | grep -qv '^superdev/' || exit 0
+# commit touched only .speccraft/ (or nothing): skip — prevents self-trigger
+git diff-tree --no-commit-id --name-only -r HEAD | grep -qv '^.speccraft/' || exit 0
 
 # already running: skip (the running loop, or the next commit, catches up)
 if ! mkdir "$LOCK" 2>/dev/null; then exit 0; fi
@@ -31,7 +31,7 @@ if ! mkdir "$LOCK" 2>/dev/null; then exit 0; fi
   python3 "$FORGE/dup0.py"    --config "$KBCFG"
   python3 "$FORGE/deps0.py"   --config "$KBCFG"
   "$FORGE/session-kit/hooks/kb-status.sh"
-  cd "$ROOT" && git add superdev && \
-    KB_SHIPLOOP=1 git commit -q -m "kb: ship-loop re-pin @$(grep -m1 '^source_commit:' superdev/kb/derived/inventory.md | awk '{print $2}')" -- superdev || true
+  cd "$ROOT" && git add .speccraft && \
+    KB_SHIPLOOP=1 git commit -q -m "kb: ship-loop re-pin @$(grep -m1 '^source_commit:' .speccraft/kb/derived/inventory.md | awk '{print $2}')" -- .speccraft || true
 ) >> "$LOG" 2>&1 &
 exit 0

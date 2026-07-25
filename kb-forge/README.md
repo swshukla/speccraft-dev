@@ -1,8 +1,8 @@
-# superdev
+# Speccraft
 
 **A trust-graded knowledge base your codebase carries with it — so agents (and you) build on what's *ratified as true*, not on guesses.**
 
-superdev turns a repo's scattered, half-lost knowledge — intent, invariants, the reasons behind decisions, the gotchas in your dependencies, the bugs nobody wrote down — into a cited, versioned, human-ratified knowledge base that lives *inside the repo* (`superdev/`) and stays honest as the code changes. `kb-forge` (this directory) is the toolkit that builds and maintains it.
+Speccraft turns a repo's scattered, half-lost knowledge — intent, invariants, the reasons behind decisions, the gotchas in your dependencies, the bugs nobody wrote down — into a cited, versioned, human-ratified knowledge base that lives *inside the repo* (`.speccraft/`) and stays honest as the code changes. `kb-forge` (this directory) is the toolkit that builds and maintains it.
 
 It is designed for the hard case: an **existing (brownfield) codebase** whose design rationale has already evaporated, worked by AI coding sessions across **Claude Code, Codex, and OpenCode**.
 
@@ -12,7 +12,7 @@ It is designed for the hard case: an **existing (brownfield) codebase** whose de
 
 Every codebase knows things nobody wrote down: why a constant is `30`, which alternative was rejected, that lapsed users still get paid features, that this dependency version has a known CVE. Code records the *outcome* of a decision, never the decision. AI agents, lacking that context, confidently repeat known mistakes and drift from intent.
 
-superdev's answer is a **grounded ratchet**: seed a knowledge base from human-adjudicated truth, validate every change against it, and let error be *caught* rather than compound. The core discipline:
+Speccraft's answer is a **grounded ratchet**: seed a knowledge base from human-adjudicated truth, validate every change against it, and let error be *caught* rather than compound. The core discipline:
 
 - **Cite or it didn't happen** — every claim is pinned to `path:line @<commit-sha>`.
 - **Provenance is never blurred** — each fact is tagged by *how it's known*: `derived` (machine-harvested), `inferred` (agent hypothesis), `elicited` (your own words), `decision` (an ADR), `external` (dependency knowledge, sub-graded by source).
@@ -60,22 +60,22 @@ Agent passes (interview, extraction, confrontation) run as Claude Code / Codex /
 
 ## Setup
 
-The toolkit lives once per machine at `~/superdev/kb-forge`. Requirements: `python3`, `git`. That's it — no API keys, no services.
+The toolkit lives once per machine at `~/.speccraft/kb-forge`. Requirements: `python3`, `git`. That's it — no API keys, no services.
 
 ## Using it on a repo
 
 **1 — Bootstrap the mechanical layers (one command):**
 ```bash
-~/superdev/kb-forge/kbforge-init.sh /path/to/your-repo
+~/.speccraft/kb-forge/kbforge-init.sh /path/to/your-repo
 ```
-This scaffolds `your-repo/superdev/`, runs every harvester (pinned to your last code commit), installs the four `superdev-*` procedures for all three tools, wires `AGENTS.md`/`CLAUDE.md`, arms the git + session hooks, and writes `KB-STATUS.md`.
+This scaffolds `your-repo/.speccraft/`, runs every harvester (pinned to your last code commit), installs the four `speccraft-*` procedures for all three tools, wires `AGENTS.md`/`CLAUDE.md`, arms the git + session hooks, and writes `KB-STATUS.md`.
 
-**2 — Tune one file:** edit `superdev/kbforge.yaml` — set `components` and `risk_paths` (the auth / money / truth-critical path patterns). Commit the scaffold.
+**2 — Tune one file:** edit `.speccraft/kbforge.yaml` — set `components` and `risk_paths` (the auth / money / truth-critical path patterns). Commit the scaffold.
 
 **3 — Do the judgment work in a Claude Code (or Codex/OpenCode) session:**
-- **Interview** (`superdev-interview`) → intent + invariants land in `kb/normative/` (`elicited`). This is the one irreducibly human step; everything downstream grounds in it. Do it first on a fresh KB.
+- **Interview** (`speccraft-interview`) → intent + invariants land in `kb/normative/` (`elicited`). This is the one irreducibly human step; everything downstream grounds in it. Do it first on a fresh KB.
 - **Extraction passes** → capability map, data sources, integrations, dependency gotchas land in `kb/inferred/` as `pending-ratification`.
-- **Confrontation batches** → answer the evidence-anchored questions in `superdev/QUEUE.md`; `superdev-ratify` promotes facts to `ratified`, rules bugs into `findings/`.
+- **Confrontation batches** → answer the evidence-anchored questions in `.speccraft/QUEUE.md`; `speccraft-ratify` promotes facts to `ratified`, rules bugs into `findings/`.
 
 **4 — Then it's self-sustaining.** Just build. Each commit runs the ship loop; drift keeps citations honest; recall grounds each task.
 
@@ -84,18 +84,18 @@ This scaffolds `your-repo/superdev/`, runs every harvester (pinned to your last 
 ## The steady-state loop
 
 ```
-session start → superdev-recall (ground in ratified truth)
-   → build → superdev-decide (log tradeoffs) / superdev-diverge (on conflict)
+session start → speccraft-recall (ground in ratified truth)
+   → build → speccraft-decide (log tradeoffs) / speccraft-diverge (on conflict)
    → git commit  ─ pre-commit lane guard ─
    → ship loop: drift → re-pin → re-harvest → kb: commit → KB-STATUS refresh
-   → superdev-ratify (founder rules the queue, occasionally)
+   → speccraft-ratify (founder rules the queue, occasionally)
    → feeds the next session
 ```
 
-- **`superdev-recall`** — before touching a module, pull its ratified facts, invariants, existing integrations, and known bugs (injected automatically on file-edit in Claude Code).
-- **`superdev-decide`** — record a tradeoff *at decision time*, so it's never lost to archaeology later.
-- **`superdev-diverge`** — never silently violate a ratified fact; file it for a ruling.
-- **`superdev-ratify`** — the founder ruling session; the only door into ratified truth.
+- **`speccraft-recall`** — before touching a module, pull its ratified facts, invariants, existing integrations, and known bugs (injected automatically on file-edit in Claude Code).
+- **`speccraft-decide`** — record a tradeoff *at decision time*, so it's never lost to archaeology later.
+- **`speccraft-diverge`** — never silently violate a ratified fact; file it for a ruling.
+- **`speccraft-ratify`** — the founder ruling session; the only door into ratified truth.
 
 ---
 
@@ -107,7 +107,7 @@ A git **pre-commit** hook keeps machine-proposed and human-ratified knowledge di
 
 ---
 
-## Layout (`your-repo/superdev/`)
+## Layout (`your-repo/.speccraft/`)
 
 ```
 kbforge.yaml       product profile: repo, components, risk_paths

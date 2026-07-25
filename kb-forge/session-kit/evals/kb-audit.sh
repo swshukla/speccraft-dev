@@ -1,7 +1,7 @@
 #!/bin/bash
 # Tier 2 KB truth audit. Mechanical checks always run (deterministic);
 # --judge adds one capped LLM pass (Task 7). Judge flags, never edits.
-# Usage: kb-audit.sh [--kb <superdev-dir>] [--root <repo-root>] [--judge]
+# Usage: kb-audit.sh [--kb <.speccraft-dir>] [--root <repo-root>] [--judge]
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 KB=""; ROOT=""; JUDGE=0
@@ -10,7 +10,7 @@ while [ $# -gt 0 ]; do case "$1" in
   *) echo "unknown arg: $1" >&2; exit 2;;
 esac; done
 [ -n "$ROOT" ] || ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-[ -n "$KB" ] || KB="$ROOT/superdev"
+[ -n "$KB" ] || KB="$ROOT/.speccraft"
 [ -d "$KB/kb" ] || exit 0
 LEGAL='ratified|ratified-partial|observed|pending-ratification|challenged'
 ISSUES=(); note(){ ISSUES+=("$1"); }
@@ -82,7 +82,7 @@ if [ "$JUDGE" -eq 1 ]; then
     # invariant compliance pass (always included)
     while read -r inv; do
       [ -z "$inv" ] && continue
-      CLAIMS+="- claim: ${inv#\#\# } | file: superdev/kb/normative/01-invariants.md"$'\n'
+      CLAIMS+="- claim: ${inv#\#\# } | file: .speccraft/kb/normative/01-invariants.md"$'\n'
     done <<<"$(grep -E '^#+ *INV-' "$KB/kb/normative/01-invariants.md" 2>/dev/null)"
     NSAMP=$(grep -c '^- claim' <<<"$CLAIMS")
     # code context: head of every anchored path referenced by sampled files
@@ -117,8 +117,8 @@ if [ "$JUDGE" -eq 1 ]; then
         [ -f "$FD" ] || cat > "$FD" <<EOF
 # Finding: KB claim precision below threshold
 - audit $(date +%F): precision $PRECISION over $NT sampled claims (< $MINP)
-- non-SUPPORTED verdicts were appended to superdev/QUEUE.md — adjudicate via
-  superdev-diverge (CONTRADICTED) / superdev-ratify (confirm) / dismiss.
+- non-SUPPORTED verdicts were appended to .speccraft/QUEUE.md — adjudicate via
+  speccraft-diverge (CONTRADICTED) / speccraft-ratify (confirm) / dismiss.
 EOF
       fi
     else

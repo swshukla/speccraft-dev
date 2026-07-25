@@ -3,7 +3,7 @@ description: Use to elicit and record product intent and invariants from the fou
 ---
 
 
-# superdev-interview — capture the intent the code can't reveal
+# speccraft-interview — capture the intent the code can't reveal
 
 Intent and invariants are `elicited` truth: they come from the person, in their
 own words, and code changes never invalidate them. This is the SEED of the
@@ -13,7 +13,7 @@ real intent, not the other way round.
 
 ## 1. Ground yourself first — never interview blind
 Read the derived layer so questions are specific and evidence-anchored:
-`superdev/kb/derived/inventory.md`, `modules.md`, `routes-*.md`,
+`.speccraft/kb/derived/inventory.md`, `modules.md`, `routes-*.md`,
 `data-model.md`; skim the repo README / docs / AGENTS.md.
 Generic questions ("what's your vision?") waste the founder's time. Anchored
 ones ("I see a `twitter_content_service` and a `calls` ledger — what are those
@@ -50,12 +50,12 @@ Anything you inferred from code/docs but the founder has NOT confirmed → mark
 
 ## 4. Close the loop
 - Contradictions you spot between stated intent and observed code → divergence
-  candidates; file via **superdev-diverge** (they become `ledger/` entries).
-- Deferred questions → `superdev/QUEUE.md`.
+  candidates; file via **speccraft-diverge** (they become `ledger/` entries).
+- Deferred questions → `.speccraft/QUEUE.md`.
 - Commit with `KB_RATIFY=1` (you are writing ratified normative truth, with the
   founder present and answering).
 
 Re-run when direction shifts — intent is versioned, not frozen; a changed
 answer supersedes the old, and git keeps the history.
 
-_Scope: the superdev/ KB in the current repo._
+_Scope: the .speccraft/ KB in the current repo._

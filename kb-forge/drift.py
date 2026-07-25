@@ -70,17 +70,17 @@ def pinned_sha(kbroot):
     sys.exit("no source_commit pin found in kb/derived/inventory.md")
 
 def last_code_commit(repo):
-    """The KB lives IN the repo (superdev/); its ship-loop commits move HEAD
+    """The KB lives IN the repo (.speccraft/); its ship-loop commits move HEAD
     without changing product code. The pin target is therefore the last commit
-    that touched anything OUTSIDE superdev/."""
+    that touched anything OUTSIDE .speccraft/."""
     return sh(["git", "log", "-1", "--format=%h", "--", ".",
-               ":(exclude)superdev"], repo).strip()
+               ":(exclude).speccraft"], repo).strip()
 
 def parse_diff(repo, pin, head):
     """Returns (old_ranges: path -> [(start,end)] changed on the pinned side,
                 added: path -> [(new_lineno, text)] lines added on the HEAD side)."""
     out = sh(["git", "diff", "--unified=0", f"{pin}..{head}", "--", ".",
-              ":(exclude)superdev"], repo)
+              ":(exclude).speccraft"], repo)
     old_ranges, added = defaultdict(list), defaultdict(list)
     old_path = new_path = None
     new_ln = 0
@@ -133,7 +133,7 @@ def main():
         return
 
     n_commits = sh(["git", "rev-list", "--count", f"{pin}..{head}", "--", ".",
-                    ":(exclude)superdev"], repo).strip()
+                    ":(exclude).speccraft"], repo).strip()
     ranges, added = parse_diff(repo, pin, head)
     changed_files = set(ranges.keys())
     deleted = {f for f in changed_files

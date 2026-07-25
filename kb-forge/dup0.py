@@ -24,7 +24,7 @@ import argparse, ast, hashlib, json, os, re, subprocess, sys, tempfile
 from collections import defaultdict
 
 SKIP_DIRS = {".git", "node_modules", ".next", "__pycache__", "venv", ".venv",
-             "dist", "build", ".pytest_cache", "superdev"}
+             "dist", "build", ".pytest_cache", ".speccraft"}
 JS_EXT = {".ts", ".tsx", ".js", ".jsx"}
 BORING = {"main", "run", "setup", "get", "post", "put", "delete", "handler",
           "handle", "init", "cli", "cleanup", "close", "start", "stop",

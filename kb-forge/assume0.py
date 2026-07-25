@@ -27,7 +27,7 @@ Usage: python3 assume0.py --config /path/to/<product>-kb/kbforge.yaml
 import argparse, json, os, re, subprocess, sys, tempfile
 
 SKIP_DIRS = {".git", "node_modules", ".next", "__pycache__", "venv", ".venv",
-             "dist", "build", ".pytest_cache", "superdev"}
+             "dist", "build", ".pytest_cache", ".speccraft"}
 PY, JS = {".py"}, {".ts", ".tsx", ".js", ".jsx"}
 CAPS = {"todo": 999, "swallow": 999, "const": 80, "timing": 60,
         "threshold": 60, "deadcode": 30, "deleted": 40, "revert": 40}

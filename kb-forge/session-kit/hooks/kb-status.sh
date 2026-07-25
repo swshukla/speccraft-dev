@@ -1,17 +1,17 @@
 #!/bin/bash
-# Regenerate superdev/KB-STATUS.md — the agent-agnostic session briefing
+# Regenerate .speccraft/KB-STATUS.md — the agent-agnostic session briefing
 # (Codex/OpenCode read this via AGENTS.md pointer; Claude also gets the live
 # SessionStart injection). Called by the post-commit ship loop. Writes only
 # when content actually changed, to avoid commit churn.
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-KB=$ROOT/superdev
-FORGE="${KBFORGE_HOME:-$HOME/superdev/kb-forge}"
+KB=$ROOT/.speccraft
+FORGE="${KBFORGE_HOME:-$HOME/.speccraft/kb-forge}"
 [ -f "$KB/kb/derived/inventory.md" ] || exit 0
 
 PIN=$(grep -m1 '^source_commit:' "$KB/kb/derived/inventory.md" | awk '{print $2}')
-LAST=$(git -C "$ROOT" log -1 --format=%h -- . ':(exclude)superdev')
+LAST=$(git -C "$ROOT" log -1 --format=%h -- . ':(exclude).speccraft')
 if [ "$PIN" = "$LAST" ]; then SYNC="in sync"; else
-  SYNC="$(git -C "$ROOT" rev-list --count "$PIN..$LAST" -- . ':(exclude)superdev' 2>/dev/null || echo '?') code commit(s) behind"
+  SYNC="$(git -C "$ROOT" rev-list --count "$PIN..$LAST" -- . ':(exclude).speccraft' 2>/dev/null || echo '?') code commit(s) behind"
 fi
 OPEN=$(grep -cE '^[0-9]+\.' "$KB/QUEUE.md" 2>/dev/null || echo '?')
 LEDGER=$(ls "$KB/ledger" 2>/dev/null | grep -c . || echo 0)
@@ -24,12 +24,12 @@ TMP=$(mktemp)
   echo "# KB status"
   echo
   echo "- pin: \`$PIN\` | last code commit: \`$LAST\` ($SYNC)"
-  echo "- open adjudication items: **$OPEN** (superdev/QUEUE.md)"
+  echo "- open adjudication items: **$OPEN** (.speccraft/QUEUE.md)"
   echo "- ratified invariants:"
   grep -E '^#+ *INV-' "$KB/kb/normative/01-invariants.md" 2>/dev/null | sed 's/^#* */  - /'
-  echo "- recall before building: \`python3 $FORGE/recall.py --config superdev/kbforge.yaml --files <repo-relative paths>\`"
-  echo "- procedures: superdev-interview / superdev-recall / superdev-decide / superdev-diverge / superdev-ratify"
-  echo "  (Claude: skills; Codex & OpenCode: /superdev-* commands)"
+  echo "- recall before building: \`python3 $FORGE/recall.py --config .speccraft/kbforge.yaml --files <repo-relative paths>\`"
+  echo "- procedures: speccraft-interview / speccraft-recall / speccraft-decide / speccraft-diverge / speccraft-ratify"
+  echo "  (Claude: skills; Codex & OpenCode: /speccraft-* commands)"
   [ -f "$KB/evals/health.md" ] && cat "$KB/evals/health.md"
 } > "$TMP"
 cmp -s "$TMP" "$KB/KB-STATUS.md" 2>/dev/null && { rm -f "$TMP"; exit 0; }

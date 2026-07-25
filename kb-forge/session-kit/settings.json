@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/swapnil/superdev/kb-forge/session-kit/hooks/kb-briefing.sh",
+            "command": "~/.speccraft/kb-forge/session-kit/hooks/kb-briefing.sh",
             "timeout": 15
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/swapnil/superdev/kb-forge/session-kit/hooks/kb-guard.sh",
+            "command": "~/.speccraft/kb-forge/session-kit/hooks/kb-guard.sh",
             "timeout": 10
           }
         ]
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/swapnil/superdev/kb-forge/session-kit/hooks/kb-recall-post.sh",
+            "command": "~/.speccraft/kb-forge/session-kit/hooks/kb-recall-post.sh",
             "timeout": 20
           }
         ]

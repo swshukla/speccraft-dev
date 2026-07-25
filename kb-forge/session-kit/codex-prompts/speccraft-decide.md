@@ -1,16 +1,16 @@
 ---
-description: Record a coding tradeoff at decision time (superdev KB repos) — constants, thresholds, approach choices, library picks.
+description: Record a coding tradeoff at decision time (.speccraft KB repos) — constants, thresholds, approach choices, library picks.
 argument-hint: <one-line summary of the decision>
 ---
 
 Decision being made: $ARGUMENTS
 
-# superdev-decide — capture the tradeoff at decision time
+# speccraft-decide — capture the tradeoff at decision time
 
-(Applies to repos with the superdev KB layout, e.g. stocktickerapp. The
-canonical procedure also lives at `.agents/skills/superdev-decide/SKILL.md`.)
+(Applies to repos with the .speccraft KB layout, e.g. stocktickerapp. The
+canonical procedure also lives at `.agents/skills/speccraft-decide/SKILL.md`.)
 
-1. Create `superdev/kb/decisions/YYYY-MM-DD-<short-slug>.md` (today's date;
+1. Create `.speccraft/kb/decisions/YYYY-MM-DD-<short-slug>.md` (today's date;
    never edit or delete an existing decision — a reversal is a NEW file citing
    the old one).
 2. Use exactly this shape:
@@ -35,4 +35,4 @@ canonical procedure also lives at `.agents/skills/superdev-decide/SKILL.md`.)
    rationale. Numeric choices (thresholds, cadences, retries, TTLs) ALWAYS
    deserve a decision file; they are exactly what gets lost.
 4. If the decision conflicts with a ratified fact, this is not a decision —
-   invoke **superdev-diverge** instead.
+   invoke **speccraft-diverge** instead.

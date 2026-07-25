@@ -1,7 +1,7 @@
 #!/bin/sh
 # kb-forge evals — telemetry append helper. POSIX sh: sourced by bash session
 # hooks AND sh git hooks. Fire-and-forget: nothing here may fail the caller.
-# Contract: kb_telemetry <event> [detail]. Needs $KB (superdev/ dir); optional
+# Contract: kb_telemetry <event> [detail]. Needs $KB (.speccraft/ dir); optional
 # $KB_SESSION_ID. detail must not contain double quotes.
 kb_telemetry() {
   [ -n "${KB:-}" ] || return 0

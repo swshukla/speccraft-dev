@@ -148,9 +148,9 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="eyebrow">superdev harness · signalcue</div>
+    <div class="eyebrow">.speccraft harness · signalcue</div>
     <h1>How a development session executes</h1>
-    <p class="lede">One product repo carries its own trust-graded knowledge base in <code>superdev/</code>. Every coding session — Claude Code, Codex, or OpenCode — runs the same loop: ground in ratified truth, build, capture judgment, commit through the guard, and let the machine re-measure the world. Three parts: install the harness once, bootstrap the KB's judgment, then every session runs the steady-state loop.</p>
+    <p class="lede">One product repo carries its own trust-graded knowledge base in <code>.speccraft/</code>. Every coding session — Claude Code, Codex, or OpenCode — runs the same loop: ground in ratified truth, build, capture judgment, commit through the guard, and let the machine re-measure the world. Three parts: install the harness once, bootstrap the KB's judgment, then every session runs the steady-state loop.</p>
     <div class="loopline"><b>brief</b> → <b>recall</b> → build → <b>decide/diverge</b> → commit ⛔<span class="dim">lane&nbsp;guard</span> → <span class="dim">ship&nbsp;loop:</span> drift → re-pin → harvest → <b>kb: commit</b> → queue → <b>founder ratifies</b> → feeds next session</div>
   </header>
 
@@ -162,10 +162,10 @@
     </div>
     <div class="tblwrap"><table>
       <tr><th>Phase</th><th>What runs</th><th>Output</th><th>Frequency</th></tr>
-      <tr><td>P0 · Tooling</td><td>kb-forge lives centrally at <code>~/superdev/kb-forge</code> (python3, git; optionally ruff)</td><td>the product-agnostic factory</td><td>once per machine</td></tr>
-      <tr><td>P1 · Scaffold</td><td><code>kbforge-init.sh /path/to/repo</code> creates the <code>superdev/</code> skeleton; human edits <code>kbforge.yaml</code> — components and <code>risk_paths</code> (the auth/money/truth patterns that deserve paranoia)</td><td>lanes: <code>kb/derived · inferred · normative · decisions</code>, <code>ledger/</code>, <code>QUEUE.md</code></td><td>once per product</td></tr>
+      <tr><td>P0 · Tooling</td><td>kb-forge lives centrally at <code>~/.speccraft/kb-forge</code> (python3, git; optionally ruff)</td><td>the product-agnostic factory</td><td>once per machine</td></tr>
+      <tr><td>P1 · Scaffold</td><td><code>kbforge-init.sh /path/to/repo</code> creates the <code>.speccraft/</code> skeleton; human edits <code>kbforge.yaml</code> — components and <code>risk_paths</code> (the auth/money/truth patterns that deserve paranoia)</td><td>lanes: <code>kb/derived · inferred · normative · decisions</code>, <code>ledger/</code>, <code>QUEUE.md</code></td><td>once per product</td></tr>
       <tr><td>P2 · Mechanical seed</td><td><code>seed0</code> + <code>assume0</code> + <code>dup0</code> — deterministic harvesters, no LLM, reading a <code>git archive</code> snapshot, never the working tree</td><td><code>kb/derived/</code> @ pin: routes, models, tests, churn, decision residue, duplicate candidates</td><td>minutes; re-runs every commit</td></tr>
-      <tr><td>P3 · Wire sessions</td><td>installer appends the <code>AGENTS.md</code> KB section (developers own the rest of the file), ensures <code>CLAUDE.md → @AGENTS.md</code>, installs the four <code>superdev-*</code> procedures to <code>.claude/skills/</code> + <code>.agents/skills/</code> + <code>.opencode/commands/</code>, generates <code>KB-STATUS.md</code></td><td>tracked — travels with every clone</td><td>once per product</td></tr>
+      <tr><td>P3 · Wire sessions</td><td>installer appends the <code>AGENTS.md</code> KB section (developers own the rest of the file), ensures <code>CLAUDE.md → @AGENTS.md</code>, installs the four <code>speccraft-*</code> procedures to <code>.claude/skills/</code> + <code>.agents/skills/</code> + <code>.opencode/commands/</code>, generates <code>KB-STATUS.md</code></td><td>tracked — travels with every clone</td><td>once per product</td></tr>
       <tr><td>P4 · Arm the clone</td><td>git hooks (<code>pre-commit</code> lane guard, <code>post-commit</code> ship loop) + <code>.claude/settings.local.json</code> (Claude live hooks)</td><td>untracked by design — git does not version hooks</td><td><b>every fresh clone / machine</b></td></tr>
     </table></div>
     <p class="lifecycle-note">An unarmed clone loses automation, not correctness: the KB, rules, and procedures are tracked and present; only the hooks need re-arming — until then, CI running the same lane check is the backstop.</p>
@@ -219,7 +219,7 @@
       <div class="stage-body">
         <div class="stage-title-row"><h2>Confrontation &amp; ratification</h2>
           <span class="chips"><span class="chip founder">founder</span></span></div>
-        <p>The batches land in <code>QUEUE.md</code> as numbered, evidence-anchored questions — a sitting of twenty answers, not an essay. <code>superdev-ratify</code> walks them: facts promote to <span class="pill ratified">ratified</span>, hypotheses get killed on the record, divergences get ruled (<code>fix-code | fix-model | accepted-deviation</code>) into <code>ledger/</code>. From here the ratchet is closed: the steady-state loop below keeps the KB honest commit by commit.</p>
+        <p>The batches land in <code>QUEUE.md</code> as numbered, evidence-anchored questions — a sitting of twenty answers, not an essay. <code>speccraft-ratify</code> walks them: facts promote to <span class="pill ratified">ratified</span>, hypotheses get killed on the record, divergences get ruled (<code>fix-code | fix-model | accepted-deviation</code>) into <code>ledger/</code>. From here the ratchet is closed: the steady-state loop below keeps the KB honest commit by commit.</p>
       </div>
     </div>
   </section>
@@ -236,18 +236,18 @@
       <div class="stage-body">
         <div class="stage-title-row"><h2>Session start — the briefing</h2>
           <span class="chips"><span class="chip hook">hook</span><span class="chip agent">agent</span></span></div>
-        <p>The agent opens in the repo and learns the KB exists before writing a line. Claude Code gets a live <b>SessionStart injection</b>; Codex and OpenCode read the same facts from <code>AGENTS.md</code> → <code>superdev/KB-STATUS.md</code>, which the ship loop keeps current as of the last commit.</p>
-        <div class="artifact">KB pin: <b>304da09</b> | last code commit: <b>304da09</b> (in sync)<br>Open adjudication items: <b>13</b> (superdev/QUEUE.md)<br>Ratified invariants: INV-1 immutable calls ledger · INV-2 hedged advice line · INV-3 signalcue.io · INV-4 best-effort alerts</div>
+        <p>The agent opens in the repo and learns the KB exists before writing a line. Claude Code gets a live <b>SessionStart injection</b>; Codex and OpenCode read the same facts from <code>AGENTS.md</code> → <code>.speccraft/KB-STATUS.md</code>, which the ship loop keeps current as of the last commit.</p>
+        <div class="artifact">KB pin: <b>304da09</b> | last code commit: <b>304da09</b> (in sync)<br>Open adjudication items: <b>13</b> (.speccraft/QUEUE.md)<br>Ratified invariants: INV-1 immutable calls ledger · INV-2 hedged advice line · INV-3 signalcue.io · INV-4 best-effort alerts</div>
       </div>
     </div>
 
     <div class="stage">
       <div class="marker">1</div>
       <div class="stage-body">
-        <div class="stage-title-row"><h2>Ground the task — superdev-recall</h2>
+        <div class="stage-title-row"><h2>Ground the task — speccraft-recall</h2>
           <span class="chips"><span class="chip agent">agent</span></span></div>
         <p>Before touching a module, the agent walks the memory palace: anchors on every KB fact are matched against the files about to change, returning facts in <b>trust order</b>. Ratified facts are restated as constraints in the plan. <b>NO&nbsp;COVERAGE</b> on a risk path is a stop sign — check the data-source and integration maps for existing capability, record the gap, then proceed.</p>
-        <div class="artifact"><span class="dim">$</span> python3 ~/superdev/kb-forge/recall.py --config superdev/kbforge.yaml \<br>&nbsp;&nbsp;&nbsp;&nbsp;--files backend/worker/tasks/generate_velocity_whisper.py<br>[ratified&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;] kb/normative/01-invariants.md &nbsp;&lt;- backend/worker/tasks<br>[pending-ratification] kb/inferred/08-consistency.md &nbsp;&lt;- backend/worker</div>
+        <div class="artifact"><span class="dim">$</span> python3 ~/.speccraft/kb-forge/recall.py --config .speccraft/kbforge.yaml \<br>&nbsp;&nbsp;&nbsp;&nbsp;--files backend/worker/tasks/generate_velocity_whisper.py<br>[ratified&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;] kb/normative/01-invariants.md &nbsp;&lt;- backend/worker/tasks<br>[pending-ratification] kb/inferred/08-consistency.md &nbsp;&lt;- backend/worker</div>
       </div>
     </div>
 
@@ -263,9 +263,9 @@
     <div class="stage">
       <div class="marker">3</div>
       <div class="stage-body">
-        <div class="stage-title-row"><h2>Judgment moments — superdev-decide / superdev-diverge</h2>
+        <div class="stage-title-row"><h2>Judgment moments — speccraft-decide / speccraft-diverge</h2>
           <span class="chips"><span class="chip agent">agent</span></span></div>
-        <p><b>superdev-decide:</b> the moment a tradeoff is made — a threshold fixed, a failure tolerated, an alternative rejected — it lands as an append-only ADR in <code>superdev/kb/decisions/</code>. "Arbitrary" is a valid rationale; invented ones are not. <b>superdev-diverge:</b> if the task conflicts with a ratified fact, the conflicting part stops, the divergence is filed in <code>QUEUE.md</code> with evidence, and a <code>TODO(superdev-diverge&nbsp;#N)</code> marks the hole. Sessions never self-ratify.</p>
+        <p><b>speccraft-decide:</b> the moment a tradeoff is made — a threshold fixed, a failure tolerated, an alternative rejected — it lands as an append-only ADR in <code>.speccraft/kb/decisions/</code>. "Arbitrary" is a valid rationale; invented ones are not. <b>speccraft-diverge:</b> if the task conflicts with a ratified fact, the conflicting part stops, the divergence is filed in <code>QUEUE.md</code> with evidence, and a <code>TODO(speccraft-diverge&nbsp;#N)</code> marks the hole. Sessions never self-ratify.</p>
       </div>
     </div>
 
@@ -275,7 +275,7 @@
         <div class="stage-title-row"><h2>Commit — the chokepoint</h2>
           <span class="chips"><span class="chip hook">git hook</span></span></div>
         <p>The <b>pre-commit lane guard</b> runs for every tool and every human. Staged changes to <code>kb/normative/</code>, <code>kb/derived/</code>, or <code>ledger/</code> are rejected unless the commit carries <code>KB_RATIFY=1</code> (a founder ruling) or <code>KB_SHIPLOOP=1</code> (the loop's own re-pin). Prose instructions can be ignored; this cannot.</p>
-        <div class="artifact"><span class="dim">$</span> git commit -m "feat: fix whisper tier gating"<br>KB lane guard: these staged paths are founder/machine lanes:<br>&nbsp;&nbsp;superdev/kb/normative/01-invariants.md<br>Agents: unstage them and propose via superdev/QUEUE.md (superdev-diverge).</div>
+        <div class="artifact"><span class="dim">$</span> git commit -m "feat: fix whisper tier gating"<br>KB lane guard: these staged paths are founder/machine lanes:<br>&nbsp;&nbsp;.speccraft/kb/normative/01-invariants.md<br>Agents: unstage them and propose via .speccraft/QUEUE.md (speccraft-diverge).</div>
       </div>
     </div>
 
@@ -284,7 +284,7 @@
       <div class="stage-body">
         <div class="stage-title-row"><h2>Ship loop — the world gets re-measured</h2>
           <span class="chips"><span class="chip machine">machine · no llm</span><span class="chip hook">git hook</span></span></div>
-        <p>Fires automatically on every code commit, backgrounded, deterministic. <b>Order matters:</b> drift runs against the <em>old</em> pin first — subtractive drift (cited lines changed → demote to challenged) and additive drift (new integrations, constants, swallowed exceptions the KB doesn't cover). Then <code>seed0</code> re-pins, <code>assume0</code>/<code>dup0</code> re-harvest residue, the status file refreshes, and the loop commits <code>superdev/</code> as a <code>kb:</code> commit. Guards: KB-only commits never re-trigger it; worktree commits skip; a lockfile collapses bursts.</p>
+        <p>Fires automatically on every code commit, backgrounded, deterministic. <b>Order matters:</b> drift runs against the <em>old</em> pin first — subtractive drift (cited lines changed → demote to challenged) and additive drift (new integrations, constants, swallowed exceptions the KB doesn't cover). Then <code>seed0</code> re-pins, <code>assume0</code>/<code>dup0</code> re-harvest residue, the status file refreshes, and the loop commits <code>.speccraft/</code> as a <code>kb:</code> commit. Guards: KB-only commits never re-trigger it; worktree commits skip; a lockfile collapses bursts.</p>
         <div class="artifact">drift&nbsp;&nbsp;<span class="dim">pin 304da09 → last code commit &lt;new&gt; · stale citations → QUEUE, new surface → QUEUE</span><br>seed0&nbsp;&nbsp;<span class="dim">re-pin derived layer @ new sha (snapshot, never the dirty tree)</span><br>assume0/dup0&nbsp;&nbsp;<span class="dim">re-harvest decision residue + duplicate candidates</span><br>kb-status&nbsp;&nbsp;<span class="dim">refresh KB-STATUS.md</span> → <b>git commit "kb: ship-loop re-pin @&lt;sha&gt;"</b></div>
       </div>
     </div>
@@ -292,7 +292,7 @@
     <div class="stage">
       <div class="marker">6</div>
       <div class="stage-body">
-        <div class="stage-title-row"><h2>Adjudicate — superdev-ratify</h2>
+        <div class="stage-title-row"><h2>Adjudicate — speccraft-ratify</h2>
           <span class="chips"><span class="chip founder">founder</span></span></div>
         <p>Human-paced, not commit-paced. The founder walks <code>QUEUE.md</code> — divergences, confrontation batches, staleness flags — one item at a time, highest consequence first. Rulings land in their lanes: facts promote to <code>kb/normative/</code>, divergences to <code>ledger/DIV-*</code> with <code>fix-code | fix-model | accepted-deviation</code>, conventions gain scope. The commit carries <code>KB_RATIFY=1</code>, and every future session's stage 0 inherits the result. <b>This is the only door into ratified truth.</b></p>
       </div>
@@ -309,7 +309,7 @@
       <tr><th>Layer</th><th>Mechanism</th><th>If an agent ignores it</th></tr>
       <tr><td>Guarantees</td><td>git <code>pre-commit</code> lane guard · <code>post-commit</code> ship loop — fire for every tool and every human</td><td>It can't. Commits to founder lanes are rejected; write-back runs regardless.</td></tr>
       <tr><td>Awareness</td><td><code>AGENTS.md</code> KB section (all three tools) · <code>KB-STATUS.md</code> auto-refreshed briefing · Claude SessionStart injection</td><td>Facts still arrive on contact (Claude) or at the git chokepoint; the agent just works less informed.</td></tr>
-      <tr><td>Procedures</td><td><code>superdev-recall</code> · <code>superdev-decide</code> · <code>superdev-diverge</code> · <code>superdev-ratify</code> — Claude skills, Codex prompts, OpenCode commands, one source</td><td>Coverage loss: decisions go uncaptured, gaps unfiled — caught later by drift and excavation, at higher cost.</td></tr>
+      <tr><td>Procedures</td><td><code>speccraft-recall</code> · <code>speccraft-decide</code> · <code>speccraft-diverge</code> · <code>speccraft-ratify</code> — Claude skills, Codex prompts, OpenCode commands, one source</td><td>Coverage loss: decisions go uncaptured, gaps unfiled — caught later by drift and excavation, at higher cost.</td></tr>
     </table></div>
   </section>
 
@@ -340,7 +340,7 @@
     <div class="tblwrap"><table>
       <tr><th>Capability</th><th>Claude Code</th><th>Codex CLI</th><th>OpenCode</th></tr>
       <tr><td>Rules at session start</td><td><span class="yes">✓</span> <span class="via">CLAUDE.md → @AGENTS.md + live briefing injection</span></td><td><span class="yes">✓</span> <span class="via">AGENTS.md → KB-STATUS.md</span></td><td><span class="yes">✓</span> <span class="via">AGENTS.md → KB-STATUS.md</span></td></tr>
-      <tr><td>Procedures</td><td><span class="yes">✓</span> <span class="via">skills (.claude/skills/)</span></td><td><span class="yes">✓</span> <span class="via">/superdev-* prompts</span></td><td><span class="yes">✓</span> <span class="via">/superdev-* commands (.opencode/)</span></td></tr>
+      <tr><td>Procedures</td><td><span class="yes">✓</span> <span class="via">skills (.claude/skills/)</span></td><td><span class="yes">✓</span> <span class="via">/speccraft-* prompts</span></td><td><span class="yes">✓</span> <span class="via">/speccraft-* commands (.opencode/)</span></td></tr>
       <tr><td>Facts injected on edit</td><td><span class="yes">✓</span> <span class="via">PostToolUse hook, incl. subagents</span></td><td>— <span class="via">procedure + git guard</span></td><td>— <span class="via">plugin port possible</span></td></tr>
       <tr><td>Lane protection</td><td><span class="yes">✓✓</span> <span class="via">edit-time deny + git guard</span></td><td><span class="yes">✓</span> <span class="via">git guard</span></td><td><span class="yes">✓</span> <span class="via">git guard</span></td></tr>
       <tr><td>Write-back on commit</td><td><span class="yes">✓</span> <span class="via">ship loop</span></td><td><span class="yes">✓</span> <span class="via">ship loop</span></td><td><span class="yes">✓</span> <span class="via">ship loop</span></td></tr>
@@ -364,7 +364,7 @@
   </section>
 
   <footer>
-    Pin convention: the KB understands the world as of the <b>last code commit</b> (<code>git log -1 -- . ':(exclude)superdev'</code>) — KB commits never move it, uncommitted code is not a fact. Code-only history: <code>git log -- ':(exclude)superdev'</code>. Tooling: <code>~/superdev/kb-forge</code> (SPEC.md); new product: <code>kbforge-init.sh &lt;repo&gt;</code>; fresh clone: <code>session-kit/install.sh</code>.
+    Pin convention: the KB understands the world as of the <b>last code commit</b> (<code>git log -1 -- . ':(exclude).speccraft'</code>) — KB commits never move it, uncommitted code is not a fact. Code-only history: <code>git log -- ':(exclude).speccraft'</code>. Tooling: <code>~/.speccraft/kb-forge</code> (SPEC.md); new product: <code>kbforge-init.sh &lt;repo&gt;</code>; fresh clone: <code>session-kit/install.sh</code>.
   </footer>
 </div>
 

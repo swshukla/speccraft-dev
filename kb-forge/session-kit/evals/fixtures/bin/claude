@@ -2,7 +2,7 @@
 # Self-test stub for the claude CLI: swallows args/stdin, emits canned verdicts.
 cat > /dev/null 2>&1 || true
 cat <<'EOF'
-[{"claim":"The app targets retail users. (documented)","file":"superdev/kb/inferred/03-pm-strategy.md","verdict":"SUPPORTED","evidence":"src/app.py:1 — app"},
- {"claim":"INV-1 The fixture ledger is append-only. (elicited)","file":"superdev/kb/normative/01-invariants.md","verdict":"POSSIBLY_STALE","evidence":"not visible in context"},
- {"claim":"INV-2 All prices come from one canonical source. (elicited)","file":"superdev/kb/normative/01-invariants.md","verdict":"CONTRADICTED","evidence":"src/app.py:1 — second source"}]
+[{"claim":"The app targets retail users. (documented)","file":".speccraft/kb/inferred/03-pm-strategy.md","verdict":"SUPPORTED","evidence":"src/app.py:1 — app"},
+ {"claim":"INV-1 The fixture ledger is append-only. (elicited)","file":".speccraft/kb/normative/01-invariants.md","verdict":"POSSIBLY_STALE","evidence":"not visible in context"},
+ {"claim":"INV-2 All prices come from one canonical source. (elicited)","file":".speccraft/kb/normative/01-invariants.md","verdict":"CONTRADICTED","evidence":"src/app.py:1 — second source"}]
 EOF
