@@ -34,7 +34,7 @@ fi
 #    .claude/skills (Claude Code) + .agents/skills (Codex & OpenCode both
 #    read the Agent Skills standard natively) + .opencode/commands (explicit
 #    /speccraft-* invocation in OpenCode).
-for s in speccraft-interview speccraft-recall speccraft-decide speccraft-diverge speccraft-ratify; do
+for s in speccraft-interview speccraft-recall speccraft-decide speccraft-diverge speccraft-ratify speccraft-eval; do
   mkdir -p "$REPO/.claude/skills/$s" "$REPO/.agents/skills/$s"
   cp "$KIT/skills/$s/SKILL.md" "$REPO/.claude/skills/$s/SKILL.md"
   cp "$KIT/skills/$s/SKILL.md" "$REPO/.agents/skills/$s/SKILL.md"
