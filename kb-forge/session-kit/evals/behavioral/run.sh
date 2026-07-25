@@ -6,7 +6,7 @@
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "not in a repo" >&2; exit 2; }
-KB="$ROOT/superdev"
+KB="$ROOT/.speccraft"
 TASKS="$KB/evals/behavioral-tasks.md"; ONLY=""
 while [ $# -gt 0 ]; do case "$1" in
   --tasks) TASKS=$2; shift 2;; --only) ONLY=$2; shift 2;;
@@ -27,24 +27,24 @@ for B in "$OUTDIR"/task-*.block; do
   [ -n "$ONLY" ] && [ "$ID" != "$ONLY" ] && continue
   PROMPT=$(sed -n 's/^prompt: //p' "$B")
   sed -n '/^tripwires:/,$p' "$B" | sed -n 's/^- //p' > "$OUTDIR/$ID.pats"
-  declare -A HITS=()
+  H_ARMED=""; H_BLIND=""
   for MODE in armed blind; do
     WT="$OUTDIR/wt-$ID-$MODE"
     git -C "$ROOT" worktree add -q "$WT" HEAD
     if [ "$MODE" = blind ]; then
-      rm -rf "$WT/superdev" "$WT/.claude" "$WT/.agents" "$WT/.opencode" "$WT/AGENTS.md"
+      rm -rf "$WT/.speccraft" "$WT/.claude" "$WT/.agents" "$WT/.opencode" "$WT/AGENTS.md"
     fi
     ( cd "$WT" && claude -p "$PROMPT" --permission-mode acceptEdits \
         --output-format text > "$OUTDIR/$ID-$MODE.txt" 2>&1 ) || true
     git -C "$WT" diff > "$OUTDIR/$ID-$MODE.diff" 2>/dev/null || true
     H=$("$HERE/check-tripwires.sh" "$OUTDIR/$ID.pats" \
         "$OUTDIR/$ID-$MODE.diff" "$OUTDIR/$ID-$MODE.txt" | sed -n 's/^HITS: //p')
-    HITS[$MODE]=$H
+    if [ "$MODE" = armed ]; then H_ARMED=$H; else H_BLIND=$H; fi
     git -C "$ROOT" worktree remove --force "$WT" 2>/dev/null || true
   done
-  echo "| $ID | ${HITS[armed]} | ${HITS[blind]} |" >> "$REPORT"
-  ARMED_TOTAL=$((ARMED_TOTAL + HITS[armed])); BLIND_TOTAL=$((BLIND_TOTAL + HITS[blind]))
-  echo "$ID: armed ${HITS[armed]} vs blind ${HITS[blind]} tripwire hits"
+  echo "| $ID | $H_ARMED | $H_BLIND |" >> "$REPORT"
+  ARMED_TOTAL=$((ARMED_TOTAL + H_ARMED)); BLIND_TOTAL=$((BLIND_TOTAL + H_BLIND))
+  echo "$ID: armed $H_ARMED vs blind $H_BLIND tripwire hits"
 done
 { echo; echo "**Totals: armed $ARMED_TOTAL vs blind $BLIND_TOTAL tripwire hits.**"
   echo; echo "Judgment calls (grade by hand per task transcripts in $OUTDIR):"
