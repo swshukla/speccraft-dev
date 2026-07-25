@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "speccraft"
+version = "0.1.0"
+description = "speccraft — trust-graded knowledge base CLI (init a .speccraft/ KB in a repo)"
+requires-python = ">=3.9"
+
+[project.scripts]
+speccraft = "speccraft.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["speccraft*"]
+
+[tool.setuptools.package-data]
+speccraft = ["forge/**/*"]
