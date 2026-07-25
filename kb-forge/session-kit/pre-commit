@@ -16,13 +16,159 @@ fi
 git rev-parse --verify HEAD >/dev/null 2>&1 || exit 0   # initial commit: skip
 
 BLOCKED=$(git diff --cached --name-only | grep -E '^.speccraft/(kb/normative/|kb/derived/|ledger/)' )
-[ -z "$BLOCKED" ] && exit 0
-kb_telemetry guard_commit_block
+if [ -n "$BLOCKED" ]; then
+  kb_telemetry guard_commit_block
+  echo "KB lane guard: these staged paths are founder/machine lanes:" >&2
+  echo "$BLOCKED" | sed 's/^/  /' >&2
+  echo "" >&2
+  echo "Agents: unstage them and propose the change via .speccraft/QUEUE.md" >&2
+  echo "        (speccraft-diverge procedure). Ratification is human-only." >&2
+  echo "Founder ratifying deliberately:  KB_RATIFY=1 git commit ..." >&2
+  exit 1
+fi
 
-echo "KB lane guard: these staged paths are founder/machine lanes:" >&2
-echo "$BLOCKED" | sed 's/^/  /' >&2
-echo "" >&2
-echo "Agents: unstage them and propose the change via .speccraft/QUEUE.md" >&2
-echo "        (speccraft-diverge procedure). Ratification is human-only." >&2
-echo "Founder ratifying deliberately:  KB_RATIFY=1 git commit ..." >&2
-exit 1
+# ---- Stale commit guard (docs/superpowers/specs/2026-07-25-stale-commit-guard.md) ----
+# Blocks when a staged file is governed by an unresolved KB item (a
+# pending-ratification fact or an open QUEUE.md item naming that file).
+# Warns, without blocking, when open items exist but name no staged file.
+# KB_ACK_STALE=1 bypasses (recorded as stale_ack telemetry).
+
+speccraft_pending_facts() {
+  # emits "<kb-file>\t<anchor>" for every KB file whose frontmatter has
+  # status: pending-ratification, one row per anchor (flow-list or block-list).
+  for f in "$KB"/kb/normative/*.md "$KB"/kb/inferred/*.md; do
+    [ -f "$f" ] || continue
+    awk -v file="$f" '
+      BEGIN { fm=0; pending=0; na=0; inlist=0 }
+      /^---[ \t]*$/ { fm++; if (fm==2) exit; next }
+      fm==1 && /^status:[ \t]*pending-ratification/ { pending=1; inlist=0; next }
+      fm==1 && /^anchors:/ {
+        line=$0; sub(/^anchors:[ \t]*/, "", line)
+        if (line ~ /^\[/) {
+          gsub(/\[|\]/, "", line)
+          n=split(line, arr, ",")
+          for (i=1;i<=n;i++) { v=arr[i]; gsub(/^[ \t]+|[ \t]+$/, "", v); if (v!="") { na++; anchors[na]=v } }
+          inlist=0
+        } else { inlist=1 }
+        next
+      }
+      fm==1 && inlist==1 && /^[ \t]*-[ \t]*/ {
+        v=$0; sub(/^[ \t]*-[ \t]*/, "", v); gsub(/^[ \t]+|[ \t]+$/, "", v)
+        if (v!="") { na++; anchors[na]=v }
+        next
+      }
+      fm==1 { inlist=0 }
+      END { if (pending) for (i=1;i<=na;i++) print file "\t" anchors[i] }
+    ' "$f"
+  done
+}
+
+speccraft_queue_paths() {
+  # emits "<item-id>\t<date>\t<path>" for every open (- [ ]) QUEUE.md item,
+  # one row per backtick-wrapped "/"-bearing token (line-range suffix
+  # stripped). Items naming no path emit one row with an empty path field,
+  # so they still count toward the warning-tier item total.
+  [ -f "$KB/QUEUE.md" ] || return 0
+  awk '
+    BEGIN { d=""; id=0 }
+    /^## .*[0-9]{4}-[0-9]{2}-[0-9]{2}/ {
+      match($0, /[0-9]{4}-[0-9]{2}-[0-9]{2}/); d=substr($0, RSTART, RLENGTH); next
+    }
+    /^- \[ \]/ {
+      id++
+      line=$0; n=0
+      while (match(line, /`[^`]*\/[^`]*`/)) {
+        tok=substr(line, RSTART+1, RLENGTH-2)
+        sub(/:[0-9]+(-[0-9]+)?$/, "", tok)
+        print id "\t" d "\t" tok
+        line=substr(line, RSTART+RLENGTH)
+        n++
+      }
+      if (n==0) print id "\t" d "\t"
+    }
+  ' "$KB/QUEUE.md"
+}
+
+kb_prefix_match() {
+  # $1=staged file $2=anchor/path — bidirectional prefix match
+  [ -z "$2" ] && return 1
+  case "$1" in "${2%/}"*) return 0 ;; esac
+  case "$2" in "${1%/}"*) return 0 ;; esac
+  return 1
+}
+
+if [ -z "$KB_ACK_STALE" ] && [ -d "$KB" ]; then
+  STAGED=$(git diff --cached --name-only | grep -vE '^\.speccraft/')
+  if [ -n "$STAGED" ]; then
+    TMPD=$(mktemp -d 2>/dev/null) || TMPD="/tmp/kbstale.$$"
+    mkdir -p "$TMPD" 2>/dev/null
+    STAGEDF="$TMPD/staged"; PENDINGF="$TMPD/pending"; QUEUEF="$TMPD/queue"
+    BLOCKF="$TMPD/blocks"; MATCHEDIDF="$TMPD/matched_ids"
+    printf '%s\n' "$STAGED" > "$STAGEDF"
+    speccraft_pending_facts > "$PENDINGF"
+    speccraft_queue_paths > "$QUEUEF"
+    : > "$BLOCKF"; : > "$MATCHEDIDF"
+
+    while IFS= read -r sf; do
+      [ -z "$sf" ] && continue
+      while IFS="$(printf '\t')" read -r kbf anchor; do
+        [ -z "$kbf" ] && continue
+        if kb_prefix_match "$sf" "$anchor"; then
+          echo "  - $sf -> ${kbf#"$KB"/} (pending-ratification, anchor: $anchor)" >> "$BLOCKF"
+        fi
+      done < "$PENDINGF"
+
+      while IFS="$(printf '\t')" read -r qid qdate qpath; do
+        [ -z "$qid" ] && continue
+        if kb_prefix_match "$sf" "$qpath"; then
+          echo "  - $sf -> QUEUE.md item $qid: \`$qpath\`" >> "$BLOCKF"
+          echo "$qid" >> "$MATCHEDIDF"
+        fi
+      done < "$QUEUEF"
+    done < "$STAGEDF"
+
+    if [ -s "$BLOCKF" ]; then
+      kb_telemetry stale_guard_block
+      echo "════════════════════════════════════════════════════════════" >&2
+      echo "KB STALE GUARD: staged files are governed by unresolved KB items" >&2
+      sort -u "$BLOCKF" >&2
+      echo "The KB cannot vouch for this code. Run speccraft-ratify" >&2
+      echo "to resolve pending items, or bypass with:" >&2
+      echo "  KB_ACK_STALE=1 git commit ..." >&2
+      echo "════════════════════════════════════════════════════════════" >&2
+      rm -rf "$TMPD" 2>/dev/null
+      exit 1
+    fi
+
+    ALL_IDS=$(awk -F'\t' '{print $1}' "$QUEUEF" | sort -u)
+    UNMATCHED_IDS=$(printf '%s\n' "$ALL_IDS" | grep -v '^$' | grep -vFx -f "$MATCHEDIDF" 2>/dev/null)
+    UCOUNT=$(printf '%s\n' "$UNMATCHED_IDS" | grep -c . 2>/dev/null)
+    UCOUNT=${UCOUNT:-0}
+    if [ "$UCOUNT" -gt 0 ]; then
+      OLDEST=$(awk -F'\t' -v ids="$UNMATCHED_IDS" '
+        BEGIN { n=split(ids, want, "\n"); for (i=1;i<=n;i++) wantset[want[i]]=1 }
+        ($1 in wantset) && $2 ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/ { print $2 }
+      ' "$QUEUEF" | sort | head -1)
+      if [ -n "$OLDEST" ]; then
+        TODAY_S=$(date -u +%s)
+        OLDEST_S=$(date -u -d "$OLDEST" +%s 2>/dev/null || date -u -j -f %Y-%m-%d "$OLDEST" +%s 2>/dev/null)
+        if [ -n "$OLDEST_S" ]; then
+          AGE_D=$(( (TODAY_S - OLDEST_S) / 86400 ))
+          AGE_TXT="oldest: ${AGE_D}d"
+        else
+          AGE_TXT="oldest: $OLDEST"
+        fi
+      else
+        AGE_TXT="age unknown"
+      fi
+      kb_telemetry stale_warn
+      echo "KB stale guard: $UCOUNT open QUEUE.md item(s) unrelated to this commit ($AGE_TXT)." >&2
+      echo "Run speccraft-ratify when convenient." >&2
+    fi
+    rm -rf "$TMPD" 2>/dev/null
+  fi
+else
+  [ -n "$KB_ACK_STALE" ] && [ -d "$KB" ] && kb_telemetry stale_ack
+fi
+
+exit 0

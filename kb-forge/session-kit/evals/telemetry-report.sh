@@ -32,13 +32,19 @@ DEN=$(uniq_sessions '=="recall_ran" or .event=="recall_empty"' || true)
 NUM=$(uniq_sessions '=="recall_ran"' || true)
 count_ev(){ printf '%s\n' "$WIN" | jq -c "select(.event==\"$1\")" | grep -c . || true; }
 RUSED=$(count_ev ratify_used); RBLOCK=$(count_ev guard_commit_block)
+SGBLOCK=$(count_ev stale_guard_block); SGACK=$(count_ev stale_ack)
+if [ "${SGBLOCK:-0}" -gt 0 ]; then
+  SGRATIO=$(awk "BEGIN{printf \"%.2f\", $SGACK/$SGBLOCK}")
+else
+  SGRATIO="n/a"
+fi
 statuses(){ printf '%s\n' "$WIN" | jq -r 'select(.event=="kb_status") | .detail'; }
 QF=$(statuses | head -1 | sed -n 's/.*queue=\([0-9]*\).*/\1/p')
 QL=$(statuses | tail -1 | sed -n 's/.*queue=\([0-9]*\).*/\1/p')
 LF=$(statuses | head -1 | sed -n 's/.*ledger=\([0-9]*\).*/\1/p')
 LL=$(statuses | tail -1 | sed -n 's/.*ledger=\([0-9]*\).*/\1/p')
 
-LINE="- evals telemetry (last ${WINDOW}d): recall ${NUM}/${DEN} sessions | ratify ${RUSED} used, ${RBLOCK} blocked | queue ${QF:-?}→${QL:-?} | ledger ${LF:-?}→${LL:-?} | unparseable ${BAD}"
+LINE="- evals telemetry (last ${WINDOW}d): recall ${NUM}/${DEN} sessions | ratify ${RUSED} used, ${RBLOCK} blocked | stale ${SGBLOCK} blocked, ${SGACK} acked (ack/block ${SGRATIO}) | queue ${QF:-?}→${QL:-?} | ledger ${LF:-?}→${LL:-?} | unparseable ${BAD}"
 echo "$LINE"
 H="$KB/evals/health.md"
 KEEP=$(grep -E '^- last (audit|behavioral):' "$H" 2>/dev/null || true)
