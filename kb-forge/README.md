@@ -57,7 +57,7 @@ Speccraft's answer is a **grounded ratchet**: seed a knowledge base from human-a
 ## Quickstart
 
 ```bash
-pipx install speccraft
+pipx install speccraft-cli
 speccraft init /path/to/your-repo
 ```
 

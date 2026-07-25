@@ -1,3 +1,3 @@
-speccraft.egg-info/
+*.egg-info/
 dist/
 build/

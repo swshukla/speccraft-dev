@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "speccraft"
+name = "speccraft-cli"
 version = "0.1.0"
 description = "speccraft — trust-graded knowledge base CLI (init a .speccraft/ KB in a repo)"
 readme = "README.md"

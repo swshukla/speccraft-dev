@@ -61,7 +61,7 @@ Agent passes (interview, extraction, confrontation) run as Claude Code / Codex /
 ## Setup
 
 ```bash
-pipx install speccraft                       # published release
+pipx install speccraft-cli                    # published release
 # or, developing kb-forge itself:
 pipx install -e /path/to/kb-forge            # editable, from this checkout
 ```
