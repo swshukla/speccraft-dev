@@ -48,7 +48,8 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_init = sub.add_parser("init", help="scaffold a .speccraft/ KB in a repo")
-    p_init.add_argument("repo", help="path to the target git repo")
+    p_init.add_argument("repo", nargs="?", default=".",
+                        help="path to the target git repo (default: current directory)")
     p_init.set_defaults(func=cmd_init)
 
     args = parser.parse_args(argv)
