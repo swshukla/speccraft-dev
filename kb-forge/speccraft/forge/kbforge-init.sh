@@ -7,7 +7,12 @@ set -e
 REPO="${1:?usage: kbforge-init.sh /path/to/repo}"
 REPO="$(cd "$REPO" && pwd)"
 FORGE="$(cd "$(dirname "$0")" && pwd)"
-git -C "$REPO" rev-parse --show-toplevel >/dev/null || { echo "$REPO is not a git repo"; exit 1; }
+git -C "$REPO" rev-parse --show-toplevel >/dev/null 2>&1 || {
+  echo "ERROR: $REPO is not a git repo. speccraft is git-native (the KB pins"
+  echo "to a commit; drift and guards ride git). Initialize first:"
+  echo "  git init && git add -A && git commit -m 'init: snapshot before speccraft'"
+  exit 1
+}
 # The KB pins to a commit; a repo with zero commits can't be pinned. On a brand
 # new repo, make one commit of your starter code first (even a stub).
 git -C "$REPO" rev-parse HEAD >/dev/null 2>&1 || {
