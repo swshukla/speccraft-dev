@@ -171,4 +171,18 @@ else
   [ -n "$KB_ACK_STALE" ] && [ -d "$KB" ] && kb_telemetry stale_ack
 fi
 
+# ---- recall_eligible proxy (harness-agnostic-recall-proxy rev 2, Part B) --
+# Count staged files with KB coverage: the upper-bound denominator for the
+# untracked recall fraction. Aggregate, sessionless, harness-independent.
+if [ -f "$KB/kbforge.yaml" ]; then
+  ELIG=$(git diff --cached --name-only | grep -vE '^\.speccraft/' || true)
+  if [ -n "$ELIG" ]; then
+    CC=$(printf '%s\n' "$ELIG" | xargs python3 "$FORGE/recall.py" \
+         --config "$KB/kbforge.yaml" --coverage-count --files 2>/dev/null)
+    M=${CC%% *}; N=${CC##* }
+    case "$M" in ''|*[!0-9]*) M=0 ;; esac
+    [ "$M" -gt 0 ] && kb_telemetry recall_eligible "$M/$N"
+  fi
+fi
+
 exit 0

@@ -1,7 +1,8 @@
 # Mission Control — Local Health Dashboard for speccraft Projects
 
 **Date:** 2026-07-25
-**Status:** Draft for review
+**Status:** Draft for review (rev 2 — stdlib server, health.json contract,
+telemetry label discipline, CLI named as prerequisite)
 
 ## Problem
 
@@ -20,6 +21,19 @@ read-only over filesystem data, one server process serving all registered
 projects. Multi-user, auth, roadmap/economics screens, and the intake write
 path are deferred to Phase 2 (cloud harness).
 
+## Step 0 — the `speccraft` CLI (prerequisite, its own work item)
+
+There is no `speccraft` CLI today — there is `kbforge-init.sh`. This spec
+(and every later phase) assumes a real entry point. Step 0 is a thin Python
+CLI (`speccraft`) that wraps the existing shell script:
+
+- `speccraft init [path]` → delegates to `kbforge-init.sh`
+- `speccraft projects add|remove|list` → manages `~/.speccraft/projects.json`
+- `speccraft dashboard` → starts the server (this spec)
+
+Small, but it is scaffolding work with its own review — not a side effect
+of the dashboard task.
+
 ## Architecture
 
 ```
@@ -29,7 +43,7 @@ path are deferred to Phase 2 (cloud harness).
 
 speccraft dashboard --port 2667
          │
-    Flask server (localhost)
+    stdlib http.server (localhost)
          │
     ┌────┴────┐
     │ REST API│  ← reads filesystem, no DB
@@ -74,7 +88,7 @@ single source of truth.
 | `GET /api/projects` | Project list with per-project health summary (recall rate, guard blocks, drift status, queue/ledger, last activity) |
 | `GET /api/projects/<name>` | Full detail for one project |
 | `GET /api/projects/<name>/telemetry?since=&event=&limit=` | Raw telemetry events from `.speccraft/evals/telemetry.jsonl`, filtered and paginated |
-| `GET /api/projects/<name>/health` | Parsed health.md summary |
+| `GET /api/projects/<name>/health` | Contents of `evals/health.json` (see Health contract below) |
 | `GET /api/projects/<name>/status` | KB-STATUS.md contents |
 | `GET /api/health` | Server alive + registered / reachable project count |
 
@@ -121,11 +135,33 @@ at `/`.
 ```
 
 - **Refresh button**: manual reload (auto-refresh every 30s via `setInterval`)
-- **Project cards**: color-coded (green ▸ yellow ▸ red) by recall rate and
-  drift flag. Click to select → detail panel below.
+- **Project cards**: color-coded (green ▸ yellow ▸ red) by drift flag, guard
+  blocks, and oldest open adjudication item age — deterministic signals.
+  Click to select → detail panel below.
 - **Detail panel**: telemetry event table for the selected project, with
   pagination and date range filter
-- **Status strip**: shows project health summary, parsed from health.md
+- **Status strip**: shows project health summary from health.json, including
+  the trust counts line (N ratified | N pending | N challenged, per the
+  trust-decay spec)
+
+### Telemetry label discipline (inherited from the recall-telemetry spec)
+
+The dashboard is the most visible telemetry surface, so it follows the same
+rules as `telemetry-report.sh` rev 2: recall figures are labeled **"tracked
+recall"** with the per-harness breakdown available in the detail panel, and
+the untracked fraction renders only as **"≤ N% (upper bound)"**. No card or
+panel may show an unqualified recall percentage — the "● 78%" in the mock
+above renders as "tracked recall 78%". Cards do not color-code on recall
+figures at all (the rate is a bound, not a health verdict); coloring uses
+the deterministic signals listed above.
+
+### Health contract — health.json, not markdown parsing
+
+`telemetry-report.sh` currently writes `evals/health.md` for humans. Rather
+than the server scraping prose, `telemetry-report.sh` gains one step: write
+`evals/health.json` alongside it (same fields, structured). The dashboard
+reads only the JSON; health.md remains the human artifact. This is a
+one-line contract between two components we own — prose-parsing is not.
 
 ### Implementation
 
@@ -133,8 +169,8 @@ New subpackage at `kb-forge/dashboard/`:
 
 ```
 kb-forge/dashboard/
-├── __init__.py         # Flask app factory
-├── server.py           # Flask routes + startup
+├── __init__.py
+├── server.py           # stdlib http.server routes + startup
 ├── project_store.py    # Read ~/.speccraft/projects.json, discover per-project data
 ├── telemetry_reader.py # Parse telemetry.jsonl with pagination/filtering
 ├── static/
@@ -145,7 +181,20 @@ kb-forge/dashboard/
     └── test_server.py
 ```
 
-Dependencies: Flask (pip installable, lightweight). No database, no build step.
+**Dependencies: none.** Everything in kb-forge is stdlib Python + shell —
+that discipline is why install is a shell script. Six read-only JSON
+endpoints do not justify the first external dependency; `http.server` +
+`json` covers them in ~100 lines. Phase 2 (auth, DB, scheduler) is where a
+real framework earns its place — that decision is deferred there, made
+consciously, not inherited from Phase 1 by default.
+
+Implementation notes:
+- Project names arriving in URL paths are validated against the registry
+  (never used to build filesystem paths directly).
+- `telemetry_reader.py` must handle telemetry-lib's rotation (5 MB /
+  10k-line guard): read the current file; if a rotated sibling exists,
+  include it when the `since` filter reaches past the current file's oldest
+  event.
 
 The existing `speccraft` CLI (currently `kbforge-init.sh`) gains new commands.
 The `dashboard` command launches the server. The `projects` commands manage the
@@ -185,3 +234,5 @@ The server logs to `~/.speccraft/dashboard.log`. No new kb_telemetry events
 - WebSockets — polling is sufficient for Phase 1
 - Auto-discovery beyond the registry file
 - Modifying telemetry data — the server is read-only
+- Web frameworks (Flask etc.) — revisited in Phase 2 where auth/DB/scheduler
+  justify one; Phase 1 stays stdlib-only

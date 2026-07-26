@@ -11,7 +11,7 @@ Task / paths under consideration: $ARGUMENTS
    `product-intent`, `monetization`, `compliance`, `data-sources`,
    `integrations`, `assumptions`, `conventions`).
 2. Run:
-   `python3 ~/.speccraft/kb-forge/recall.py --config .speccraft/kbforge.yaml --files <paths>`
+   `python3 ~/.speccraft/kb-forge/recall.py --config .speccraft/kbforge.yaml --files <paths> --harness opencode`
    (add `--topic <slug>` for topics; both may be combined)
 3. Interpret by trust class, in order:
    - `ratified` / `INV-*` invariants → **constraints**. Restate the relevant

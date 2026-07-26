@@ -10,8 +10,11 @@ description: Use before modifying any module in this repo, and before adding any
    `product-intent`, `monetization`, `compliance`, `data-sources`,
    `integrations`, `assumptions`, `conventions`).
 2. Run:
-   `python3 ~/.speccraft/kb-forge/recall.py --config .speccraft/kbforge.yaml --files <paths>`
+   `python3 ~/.speccraft/kb-forge/recall.py --config .speccraft/kbforge.yaml --files <paths> --harness claude-skill`
    (add `--topic <slug>` for topics; both may be combined)
+   Then pre-clear the recall gate for those paths so your first edit isn't
+   bounced (skip harmlessly if the session variable is unset):
+   `for p in <paths>; do echo "$p" >> "${TMPDIR:-/tmp}/speccraft-recall-seen-${CLAUDE_SESSION_ID:-nosession}"; done`
 3. Interpret by trust class, in order:
    - `ratified` / `INV-*` invariants → **constraints**. Restate the relevant
      ones in your plan; your change must satisfy them or you must invoke

@@ -1,7 +1,8 @@
 # Repowise Sidecar Integration — Multi-Repo Code Intelligence for speccraft
 
 **Date:** 2026-07-25
-**Status:** Draft for review
+**Status:** Draft for review (rev 2 — decision-sync provenance fix, hook
+folded into recall.py, graceful degradation, augments-not-replaces)
 **Depends on:** `2026-07-25-mission-control-cloud.md`, `docs/agentic-sdlc/04-seeding-and-verification.md`, `docs/agentic-sdlc/03-drift-reconciler.md`, `docs/agentic-sdlc/18-first-principles-intent.md`
 
 ## Problem
@@ -17,6 +18,24 @@ speccraft's KB seeding (`seed0.py`), drift detection (`drift.py`), and cross-rep
 
 This spec defines the **sidecar integration** — Repowise runs as a separate process, speccraft calls its CLI/MCP API. No library dependency, license-isolated, replaceable.
 
+## Two ground rules (rev 2)
+
+**1. Graceful degradation is mandatory.** Every Repowise call site (seed0,
+drift, recall, Mission Control) must work with the sidecar absent, using
+deps0's existing discipline: *"when a scanner is absent it is recorded as a
+coverage gap, never silently skipped."* Sidecar missing or timing out →
+skip the enrichment, write/print a coverage-gap line, exit clean. speccraft
+without Repowise is fully functional; Repowise adds signal, never a
+dependency.
+
+**2. Capability audit before implementation.** This spec assumes ~15
+CLI/JSON surfaces with specific shapes (`inspect --json`, `risk --diff`,
+`decision list --json`, `get_context`, workspace commands). Before any
+integration code: verify each against the actually-installed Repowise
+version, pin `repowise_min_version:` in kbforge.yaml, and mark any surface
+that is roadmap-not-shipped as deferred in this spec. Integration code
+checks the version at startup and degrades (rule 1) on mismatch.
+
 ---
 
 ## Architecture
@@ -26,7 +45,7 @@ This spec defines the **sidecar integration** — Repowise runs as a separate pr
 │                    speccraft (agent governance)                  │
 │  kbforge.yaml  →  seed0.py  →  .speccraft/kb/                   │
 │  drift.py      →  .speccraft/ledger/                            │
-│  hooks         →  kb-recall-pre.sh / kb-recall-post.sh          │
+│  hooks         →  kb-recall-gate.sh / kb-recall-post.sh         │
 │  Mission Control dashboard                                     │
 ├─────────────────────────────────────────────────────────────────┤
 │                    Repowise Sidecar                              │
@@ -311,18 +330,37 @@ Each decision is:
 - **Linked to graph nodes** — the code it governs
 - **Tracked for staleness** — flags when governed code changes
 
-### Integration with speccraft KB
+### Integration with speccraft KB — evidence feeder, never ratifier
 
-Repowise decisions become **evidence for KB facts**:
+Mined decisions are machine-extracted, however evidence-backed — so they
+enter the KB the way every other observation does: **graded, below
+normative, awaiting the founder.** Rev 1 of this spec wrote them "to
+kb/decisions/ or kb/normative/ based on confidence" — that is
+self-ratification by sidecar, it violates the system's one non-negotiable
+rule (*trust rises only through the founder*), and the lane guard would
+block the normative write at runtime anyway. The corrected flow:
+
+- All synced decisions land in `kb/decisions/repowise-mined.md` with
+  `status: pending-ratification` (Repowise `exact` confidence) or
+  `status: observed` (`fuzzy` / `unverified`). **Never normative, at any
+  confidence.**
+- Repowise's evidence spans, governed nodes, and staleness flag ride along
+  as the fact's evidence block — this is what makes these high-quality
+  ratification candidates.
+- Promotion to `kb/normative/` happens exactly one way: `speccraft-ratify`.
+  Repowise shortens the founder's path to a decision; it never takes the
+  decision.
 
 ```
-# .speccraft/kb/normative/01-invariants.md
+# .speccraft/kb/decisions/repowise-mined.md  (session-writable lane)
 
-## INV-3: All external API calls wrapped in CircuitBreaker
+## DEC-R847: All external API calls wrapped in CircuitBreaker
+- status: pending-ratification        # exact-confidence mined decision
 - Source: Repowise decision (PR #847, commit a1b2c3d4)
 - Evidence: "after payment provider outages in Q3 2024"
 - Governs: shared/http/client.ts (PageRank 0.87)
 - Staleness: 3 of 14 governed files changed since recorded
+- Ratify → kb/normative/01-invariants.md as INV-candidate
 ```
 
 ### Implementation
@@ -334,20 +372,27 @@ def sync_repowise_decisions(kb_root: Path, repo: Path) -> list:
         ["repowise", "decision", "list", "--json"], cwd=repo, capture_output=True
     )
     decisions = json.loads(result.stdout)
-    
+
+    STATUS = {"exact": "pending-ratification"}  # fuzzy/unverified → observed
     for d in decisions:
-        # Map to KB facts format
         fact = {
-            "id": f"DEC-{d['id']}",
+            "id": f"DEC-R{d['id']}",
             "statement": d["summary"],
+            "status": STATUS.get(d["confidence"], "observed"),
             "evidence": d["evidence_spans"],
             "confidence": d["confidence"],  # exact/fuzzy/unverified
             "governs": d["governed_nodes"],
             "stale": d["staleness_flag"]
         }
-        # Write to kb/decisions/ or kb/normative/ based on confidence
-        write_kb_fact(fact)
+        write_kb_fact(fact, lane="decisions")   # never normative
+
+    # exact-confidence facts also queue for ratification (one digest item
+    # per sync run, not one per decision — founder-queue discipline)
 ```
+
+Sync is idempotent (keyed on `DEC-R<id>`); re-syncs update evidence and
+staleness on existing entries, never status — status changes belong to the
+founder (upward) and the trust-decay mechanism (downward).
 
 ---
 
@@ -357,49 +402,35 @@ def sync_repowise_decisions(kb_root: Path, repo: Path) -> list:
 
 - `kb-briefing.sh` — SessionStart, injects KB summary
 - `kb-guard.sh` — PreToolUse, lane guard
-- `kb-recall-post.sh` — PostToolUse, auto-recall on file edit
-- `kb-status.sh` — PostToolUse, regenerates KB-STATUS.md
+- `kb-recall-gate.sh` — PreToolUse, deny-once on normative-anchored files
+  (recall-gate spec)
+- `kb-recall-post.sh` — PostToolUse, capture-on-contact recall
+- `kb-status.sh` — regenerates KB-STATUS.md
 
-### Enhanced hooks with Repowise
+### No new hook — Repowise context rides inside recall (rev 2)
 
-**New hook: `kb-repowise-pre.sh`** — PreToolUse, injects Repowise context
+Rev 1 proposed a fourth hook on `Edit|Write|MultiEdit`
+(`kb-repowise-pre.sh`). Dropped, for three reasons:
 
-```bash
-# kb-repowise-pre.sh (installed by speccraft init)
-#!/bin/sh
-# Runs before every tool call, injects graph context
+1. **It was technically wrong**: it read the file path from `$1` (hooks
+   receive JSON on stdin) and echoed plain text (PreToolUse context must go
+   through `hookSpecificOutput.additionalContext` — the recall-gate spec
+   learned this the hard way).
+2. **The matcher is already carrying three hooks.** A fourth process spawn
+   plus a sidecar round-trip on every edit is real per-edit latency.
+3. **Recall is the injection channel by design.** One channel, one dedup
+   cache, one timing story.
 
-FILE="$1"  # file being edited/read
-
-# Get Repowise context for this file
-CONTEXT=$(repowise get_context --target "$FILE" --include callers,callees,ownership,health 2>/dev/null || true)
-
-if [ -n "$CONTEXT" ]; then
-  # Format for agent
-  echo "## Repowise Context for $FILE"
-  echo "$CONTEXT" | jq -r '
-    "Summary: \(.summary)",
-    "Hotspot: \(.hotspot)",
-    "Health: \(.health_score)/10",
-    "Callers: \(.callers | length)",
-    "Callees: \(.callees | length)",
-    "Owner: \(.primary_owner // "unknown")",
-    "Governing decisions: \(.governing_decisions | length)"
-  '
-fi
-```
-
-**Installed via settings.json:**
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      { "matcher": "Edit|Write|MultiEdit", "command": "kb-repowise-pre.sh" }
-    ]
-  }
-}
-```
+Instead, `recall.py` gains an optional Repowise enrichment: when
+`repowise.enabled` and the sidecar answers within a **500 ms timeout**,
+append a compact context block to the recall output for the target file —
+summary, hotspot flag, health score, caller/callee counts, owner, count of
+governing mined decisions. Timeout or absent sidecar → recall output
+unchanged (ground rule 1); a `repowise: unavailable` line appears at most
+once per session. The existing per-session-per-file dedup cache already
+prevents repeat lookups. Every existing recall consumer — the post hook,
+the recall gate's deny reason, CLI/prompt-driven recall in OpenCode/Codex —
+inherits the enrichment with zero new moving parts.
 
 ### MCP tools available to agents
 
@@ -431,7 +462,9 @@ When `repowise init` runs, it registers the MCP server. Agents (Claude Code, Cod
 
 # New: update Repowise index
 if [ -f ".repowise/config.yaml" ] || [ -f ".repowise-workspace.yaml" ]; then
-  repowise update &  # background, incremental, ~seconds
+  # background, incremental, ~seconds — but never silent: log output, and
+  # stamp .repowise/last-update so staleness is detectable
+  repowise update >> .speccraft/evals/repowise-update.log 2>&1 &
 fi
 ```
 
@@ -495,9 +528,9 @@ repowise:
   prose: false
   provider: ""              # anthropic|openai|gemini (for prose mode)
   health_threshold: 5       # drift flags files below this
-  sync_decisions: true      # sync Repowise decisions to KB
-  hooks:
-    pre_edit: true          # install kb-repowise-pre.sh
+  sync_decisions: true      # sync mined decisions to kb/decisions/ (graded)
+  repowise_min_version: ""  # pinned by the capability audit
+  recall_enrich: true       # recall.py appends Repowise context (500ms timeout)
   mcp:
     register: true          # register MCP server on init
 ```
@@ -552,13 +585,34 @@ contracts:
 
 ---
 
-## What this changes in earlier specs
+## What this changes in earlier specs — augments, does not replace
 
-- **`2026-07-25-stale-commit-guard.md`**: The stale check can also verify Repowise index freshness (stale warning from MCP tools)
-- **`2026-07-25-anchor-scope-drift.md`**: Repowise change risk replaces blast-radius heuristic
-- **`2026-07-25-dep-diff.md`**: Repowise dependency graph + package deps supersede deps0.py for cross-repo
-- **`docs/agentic-sdlc/04-seeding-and-verification.md`**: seed0.py uses Repowise data
-- **`docs/agentic-sdlc/03-drift-reconciler.md`**: drift.py uses Repowise risk scoring
-- **`docs/agentic-sdlc/18-first-principles-intent.md`**: Cross-repo concept registry solved by workspace contracts
-- **`2026-07-25-mission-control-cloud.md`**: Mission Control embeds Repowise views
-- **`docs/agentic-sdlc/17-multi-org-multi-product.md`**: Workspaces are per-cell; Repowise runs in-cell
+Rev 1 said "replaces" and "supersedes" in places where the rev-2 spec pass
+had already assigned precise ownership. Corrected:
+
+- **`2026-07-25-stale-commit-guard.md` (rev 2)**: unchanged. The warning
+  tier *may* additionally mention a stale Repowise index (from
+  `.repowise/last-update`) — informational, never blocking.
+- **`2026-07-25-anchor-scope-drift.md` (rev 2)**: **complements.** Anchor
+  scope drift is prefix matching (no blast-radius heuristic exists there to
+  replace). Repowise change risk arrives as an additional, clearly labeled
+  drift section; anchor-scope findings remain the T2 judge-targeting
+  source.
+- **`2026-07-25-dep-diff.md` (rev 2)**: **deps0 stays authoritative** for
+  version pinning and CVE advisories (Repowise does neither). Repowise adds
+  the *dependency graph* dimension (who imports what, cross-repo) — a
+  different axis, reported separately.
+- **`2026-07-25-trust-decay.md`**: mined-decision sync respects it —
+  Repowise staleness flags may feed the queue, but only deterministic
+  drift evidence demotes.
+- **`docs/agentic-sdlc/04-seeding-and-verification.md`**: seed0.py is
+  enriched by Repowise data (with the coverage-gap fallback).
+- **`docs/agentic-sdlc/03-drift-reconciler.md`**: drift.py gains Repowise
+  risk scoring as a fourth signal (fallback: section absent).
+- **`docs/agentic-sdlc/18-first-principles-intent.md`**: cross-repo concept
+  registry served by workspace contracts.
+- **`2026-07-25-mission-control-cloud.md` (rev 2)**: Mission Control embeds
+  Repowise views; the earned-autonomy blast-radius gate uses Repowise when
+  present, the conservative files-changed fallback otherwise.
+- **`docs/agentic-sdlc/17-multi-org-multi-product.md`**: workspaces are
+  per-cell; Repowise runs in-cell.

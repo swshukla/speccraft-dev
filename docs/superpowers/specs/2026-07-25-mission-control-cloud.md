@@ -1,7 +1,8 @@
 # Mission Control — Cloud Autonomous Server
 
 **Date:** 2026-07-25
-**Status:** Draft for review
+**Status:** Draft for review (rev 2 — execution harness specified, governance
+requirement, earned auto-merge, auth mandatory off-localhost, milestones)
 **Depends on:** `2026-07-25-mission-control.md` (Phase 1 local dashboard), `docs/agentic-sdlc/09-mixed-input-reality.md`, `15-work-item-taxonomy.md`, `11-execution-view.md`, `08-product-manager-agent.md`
 
 ## Problem
@@ -154,9 +155,15 @@ INTAKE → ELICITING → TRIAGED → QUEUED → RUNNING → AWAITING_HUMAN → R
 - **RUNNING** — a worker is executing this
 - **AWAITING_HUMAN** — needs human ratification (intent, spec, design review)
 - **RESOLVED** — completed successfully
+- **FAILED** — the current run errored; transient state, immediately
+  re-queued (retry_count++) or moved to PARKED at max_retries
 - **PARKED** — failed after max retries, needs human intervention
 - **REJECTED** — intake determined this isn't actionable
 - **CANCELLED** — human cancelled
+
+**AWAITING_HUMAN exits:** approve → QUEUED (next stage resumes where it
+paused); reject with guidance → TRIAGED (re-planned with the feedback);
+reject outright → CANCELLED. Every exit is a recorded human_action.
 
 ### Priority calculation
 
@@ -181,6 +188,9 @@ impact_multiplier:
   blast-radius <= 10% = 1.0
 ```
 
+All constants live in config (`scheduler.priority:` block), not code — they
+are starting guesses to be tuned from cycle-time telemetry, not findings.
+
 ### Scheduling
 
 The background scheduler runs every `poll_interval` seconds:
@@ -200,6 +210,31 @@ The background scheduler runs every `poll_interval` seconds:
 
 ---
 
+## Execution harness — what actually runs (rev 2: previously unspecified)
+
+Every "agent does X" below is a **Claude Code headless invocation** (`claude -p`,
+or the Agent SDK once the pipeline needs programmatic control), executed inside
+the run's worktree. The harness contract:
+
+- **One stage = one invocation.** Each pipeline stage (spec, design, build,
+  verify) is a separate `claude -p` call with a stage prompt template plus the
+  work item's accumulated context. Stage outputs are structured (JSON via
+  `--output-format`), validated by the executor before the stage is marked
+  complete; unparseable output = stage failure, normal retry path.
+- **Per-stage tool permissions** via `--allowedTools`: spec/design stages are
+  read-only (Read/Grep/Glob); build gets Edit/Write/Bash; verify gets Bash.
+- **Session-kit governance is a hard requirement, not an option.** Runs execute
+  in a checkout with `.speccraft/` present, so the full hook stack fires:
+  SessionStart briefing, lane guard, recall gate (deny-once on
+  normative-anchored files), capture-on-contact, telemetry. This is the point
+  of the whole system: the agents most in need of KB governance are the
+  unattended ones. Any run harness that bypasses the session-kit (raw API
+  calls, custom loops) is out of contract. Autonomous runs also may never set
+  `KB_RATIFY=1`, `KB_ACK_STALE=1`, or write outside session lanes — the same
+  rules as human-driven sessions, enforced by the same guards.
+- **Cost/timeout**: `--max-turns` and the run timeout bound each invocation;
+  token counts are read from the harness result JSON into `runs.tokens_used`.
+
 ## Autonomous execution
 
 This is where the server "knocks off tasks." For each running work item, the executor
@@ -214,7 +249,8 @@ runs the appropriate pipeline from `11-execution-view.md`:
 3. Fix — Coder agent writes the fix
 4. Verify — run existing tests + new test for the fix
 5. PR — open a pull request with evidence pack
-6. If all gates pass + blast-radius <= 10% + fix classified as root-cause → auto-merge
+6. If auto-merge is EARNED for this repo (see Earned autonomy) and all gates
+   pass + blast-radius <= 10% + fix classified as root-cause → auto-merge
    Else → AWAITING_HUMAN (human reviews PR)
 ```
 
@@ -227,8 +263,33 @@ runs the appropriate pipeline from `11-execution-view.md`:
 4. Verify — run acceptance tests + regression + lint
 5. Gates — spec-conformance, blast-radius, policy
 6. PR — open pull request
-7. If L3 (all gates green, blast-radius <= 10% of repo, no auth/payments/PII) → auto-merge
+7. If auto-merge is EARNED for this repo and L3 (all gates green, blast-radius
+   <= 10% of repo, path not matching risk_paths in kbforge.yaml) → auto-merge
    Else → AWAITING_HUMAN
+
+### Earned autonomy — auto-merge is ratification, and is governed like it
+
+The KB's core rule is *trust rises only through the founder; never
+self-ratify*. An executor merging its own PR because its own gates passed is
+self-ratification of code — same sin, different lane. So auto-merge follows
+the ratification model:
+
+- **Default off, globally.** `auto_merge: false` in config; v1 ships with
+  every PR going to AWAITING_HUMAN.
+- **Earned per-repo, granted by the founder.** After N supervised successes
+  (default 20 merged-without-modification PRs of the same type in that
+  repo), Mission Control *offers* auto-merge for that repo + work-item type;
+  the founder enables it explicitly. The grant is recorded in the audit log.
+- **Revoked on evidence.** Any reverted auto-merged PR suspends the grant
+  for that repo + type until the founder re-enables it.
+- **Never eligible:** paths matching `risk_paths`, any diff touching
+  `.speccraft/` normative/derived/ledger lanes, or any run where a KB guard
+  fired (a guard block during the run means the agent tried something the
+  KB forbids — that PR gets human eyes regardless of gates).
+- The blast-radius gate depends on a computation supplied by the Repowise
+  sidecar (or a conservative fallback: files-changed / repo-files). Until
+  the sidecar is present, the fallback applies and the threshold is
+  conservative.
 ```
 
 ### Feature / PRD path (composite)
@@ -435,13 +496,45 @@ speccraft work-item <id> --park --reason "needs more info"
 | **Scheduler** | In-process loop | In-process loop (same code) |
 | **Worker isolation** | git worktree + temp dir | Docker container per run |
 | **Model access** | Local API key (Claude Code) | Model Gateway (metered) |
-| **Auth** | None (local only) | IdP (org's SSO) |
+| **Auth** | None (localhost bind only) | Required: API tokens (v1) → IdP/SSO |
 | **Repos** | Local filesystem paths | Mounted volumes or git clone |
 | **Default concurrency** | 1 | 3 (configurable) |
 | **Web UI** | localhost:2667 | same UI, behind auth |
 
 The local mode is a strict subset — same code, same API, same UI, fewer moving parts.
 A developer can prototype locally, then deploy the same binary to the cloud when ready.
+
+### Threat model (minimum, non-negotiable)
+
+The intake API accepts input that causes agents to execute against repos —
+unauthenticated intake is remote code execution. Therefore:
+
+- **The server refuses to start with `host != 127.0.0.1` and no auth
+  configured.** API tokens (per-user, revocable) are the v1 mechanism; IdP/SSO
+  replaces them for team cloud. There is no unauthenticated non-local mode.
+- **Work-item bodies are data, never instructions to the server.** They are
+  passed to agents as quoted task content; prompt-injection defense inside
+  runs relies on the session-kit guards + per-stage tool allowlists + the
+  earned-autonomy rule that a guard block forces human review.
+- **Secrets:** runs get a scoped git credential (push to run branches, open
+  PRs; no force-push, no admin). Model keys live in the server env, never in
+  worktrees or work-item metadata. Runs have no access to other repos'
+  worktrees or the server DB.
+
+---
+
+## Milestones — Phase 2 is not one mountain
+
+| Milestone | Delivers | Autonomy level |
+|---|---|---|
+| **2a** | DB + work-item CRUD + queue UI + *manually triggered* runs (human clicks "run"; executor runs one stage pipeline end-to-end) | none — human triggers everything |
+| **2b** | Scheduler on + autonomous **bug path** only, all PRs to AWAITING_HUMAN | supervised |
+| **2c** | Task/enhancement path + earned auto-merge machinery (grants, revocation) | earned, per-repo |
+| **2d** | Feature/PRD decomposition + PM-agent elicitation (one-liner path) | full pipeline |
+
+Each milestone is releasable and each one exercises the execution harness
+before the next raises the stakes. 2a is where the harness contract above
+gets proven; nothing autonomous ships until it has.
 
 ---
 

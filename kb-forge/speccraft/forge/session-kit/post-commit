@@ -25,7 +25,9 @@ if ! mkdir "$LOCK" 2>/dev/null; then exit 0; fi
 (
   trap 'rmdir "$LOCK"' EXIT
   echo "--- ship loop $(date) [$ROOT] ---"
-  python3 "$FORGE/drift.py"   --config "$KBCFG" --queue
+  python3 "$FORGE/drift.py"   --config "$KBCFG" --queue --demote
+  python3 "$FORGE/dep-diff.py" --config "$KBCFG" --queue
+  python3 "$FORGE/decay.py"   --config "$KBCFG"
   python3 "$FORGE/seed0.py"   --config "$KBCFG"
   python3 "$FORGE/assume0.py" --config "$KBCFG"
   python3 "$FORGE/dup0.py"    --config "$KBCFG"

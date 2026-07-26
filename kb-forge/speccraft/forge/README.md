@@ -4,7 +4,7 @@
 
 Speccraft turns a repo's scattered, half-lost knowledge — intent, invariants, the reasons behind decisions, the gotchas in your dependencies, the bugs nobody wrote down — into a cited, versioned, human-ratified knowledge base that lives *inside the repo* (`.speccraft/`) and stays honest as the code changes. `kb-forge` (this directory) is the toolkit that builds and maintains it.
 
-It is designed for the hard case: an **existing (brownfield) codebase** whose design rationale has already evaporated, worked by AI coding sessions across **Claude Code, Codex, and OpenCode**.
+It is designed for the hard case: an **existing (brownfield) codebase** whose design rationale has already evaporated, worked by AI coding sessions across **Claude Code, Codex, and OpenCode**. Every greenfield project is a brownfield project in six months — run it from day one and there's nothing to reconstruct later.
 
 ---
 

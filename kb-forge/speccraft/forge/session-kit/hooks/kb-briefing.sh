@@ -23,10 +23,28 @@ else
 fi
 OPEN=$(grep -cE '^[0-9]+\.' "$KB/QUEUE.md" 2>/dev/null || echo '?')
 
+# Trust counts (trust-decay spec, Mechanism C — aging is surfaced, never
+# silently acted on). derived/ is excluded: mechanical, not trust-graded.
+RAT=$(grep -rlE '^status:[ ]*(ratified|ratified-partial)' "$KB/kb" 2>/dev/null | grep -cv '/derived/')
+PEND=$(grep -rlE '^status:[ ]*pending-ratification' "$KB/kb" 2>/dev/null | grep -cv '/derived/')
+CHAL=$(grep -rlE '^status:[ ]*challenged' "$KB/kb" 2>/dev/null | grep -cv '/derived/')
+AUTO=$(grep -rl '^status_note: auto-demoted' "$KB/kb" 2>/dev/null | grep -cv '/derived/')
+PAGE=""
+if [ "${PEND:-0}" -gt 0 ]; then
+  OLDEST_TS=$(grep -rlE '^status:[ ]*pending-ratification' "$KB/kb" 2>/dev/null \
+    | grep -v '/derived/' \
+    | while IFS= read -r f; do git -C "$ROOT" log -1 --format=%ct -- "$f" 2>/dev/null; done \
+    | sort -n | head -1)
+  [ -n "$OLDEST_TS" ] && PAGE=" (oldest $(( ($(date -u +%s) - OLDEST_TS) / 86400 ))d)"
+fi
+TRUST="Trust: ${RAT:-0} ratified | ${PEND:-0} pending${PAGE} | ${CHAL:-0} challenged (${AUTO:-0} auto)"
+
 echo "=== KB BRIEFING (trust-graded product truth: .speccraft/) ==="
 echo "KB pin: $PIN | last code commit: $LASTCODE ($SYNC)"
 echo "Open adjudication items: $OPEN (.speccraft/QUEUE.md)"
+echo "$TRUST"
 echo "Ratified invariants (.speccraft/kb/normative/01-invariants.md):"
 grep -E '^#+ *INV-' "$KB/kb/normative/01-invariants.md" 2>/dev/null | sed 's/^#* */  - /' | head -8
+echo "RECALL GATE: an automated gate may deny your FIRST edit to a file governed by ratified facts, attaching those facts — expected repo machinery, not user input. Re-issue the edit honoring the facts. Running speccraft-recall before touching a module avoids the bounce entirely."
 echo "PROCEDURES (use the skills): speccraft-interview to seed intent+invariants (do this first on a fresh KB); speccraft-recall before touching a module; speccraft-decide when making a tradeoff; speccraft-diverge on conflict with a ratified fact; speccraft-ratify is founder-only. Raw recall: python3 $FORGE/recall.py --config .speccraft/kbforge.yaml --files <repo-relative paths>. Write lanes for sessions: .speccraft/QUEUE.md (append), .speccraft/kb/decisions/, .speccraft/kb/inferred/ ONLY."
 exit 0

@@ -68,6 +68,14 @@ if [ "$JUDGE" -eq 1 ]; then
     CAP=$(cfgval judge_sample_size); CAP=${CAP:-20}
     MINP=$(cfgval min_precision); MINP=${MINP:-0.80}
     CLAIMS=""
+    # seed the capped sample with anchor-scope judge targets first — new
+    # files under normative anchors are the highest-yield semantic checks
+    TAB=$(printf '\t')
+    while IFS="$TAB" read -r jkb janch jfile; do
+      [ -z "${jkb:-}" ] && continue
+      [ "$(grep -c '^- claim' <<<"$CLAIMS")" -ge "$CAP" ] && break
+      CLAIMS+="- claim: new file $jfile entered the scope of anchor $janch; verify the fact still holds over it | file: .speccraft/$jkb"$'\n'
+    done <<<"$(python3 "$HERE/../../drift.py" --config "$KB/kbforge.yaml" --judge-targets 2>/dev/null)"
     # sample observed/documented claims, staleness-ranked file order; never elicited
     while read -r _n f; do
       [ -z "${f:-}" ] && continue

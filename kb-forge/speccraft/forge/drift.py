@@ -22,12 +22,25 @@ ADDITIVE — new decision/integration surface entered the code that no KB fact
                                kb/inferred/07-assumptions.md (new residues are
                                new hypotheses for the confrontation batch)
 
+ANCHOR SCOPE — new files added under a fact's directory anchors since the pin
+  (spec 2026-07-25-anchor-scope-drift.md rev 2). The fact governs those files
+  implicitly; the founder verifies the fact still holds or narrows the anchor.
+  Harness-independent backstop: catches files created via Bash, by humans, or
+  in hookless harnesses. Normative-anchored findings queue (--queue) and feed
+  the T2 judge (--judge-targets); inferred/decisions stay report-only.
+
 Usage: python3 drift.py --config /path/to/<product>-kb/kbforge.yaml [--queue]
-  --queue  append findings (both directions) to QUEUE.md
+  --queue          append findings (all directions) to QUEUE.md
+  --judge-targets  print machine-readable normative anchor-scope findings
+                   (kb_file<TAB>anchor<TAB>added_file) and exit — consumed by
+                   kb-audit.sh to seed the capped LLM-judge sample
 """
 import argparse, os, re, subprocess, sys
 from collections import defaultdict
 from datetime import datetime, timezone
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from recall import frontmatter, log_telemetry  # shared parser + telemetry
 
 CITE = re.compile(r"([\w@./-]+/[\w.-]+\.(?:py|tsx|ts|jsx|js|md|yaml|yml|toml|sql)):(\d+)(?:-(\d+))?")
 HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
@@ -105,6 +118,99 @@ def parse_diff(repo, pin, head):
             new_ln += 1
     return old_ranges, added
 
+def demote(kbroot, findings, pin, head):
+    """Trust decay Mechanism A (spec 2026-07-25-trust-decay.md): execute the
+    demotion policy this file has always DECLARED (docstring line 11) but
+    only printed. Trust rises only through the founder; it falls
+    mechanically, on evidence, with a ledger entry. Policy by lane:
+      inferred/decisions: cited-file-DELETED or cited-lines-changed → challenged
+      normative:          cited-file-DELETED only → challenged (a ratified
+                          fact citing a nonexistent file is the KB lying);
+                          lines-changed stays founder-adjudicated (queue)
+      derived:            never touched here (regenerated mechanically)
+    Content is never modified — one status flip + a status_note, reversible
+    by exactly one human action (speccraft-ratify)."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    demoted = []
+    for kbf, path, rng, sev in findings:
+        if sev == "file-changed-elsewhere":
+            continue
+        parts = kbf.split(os.sep)
+        lane = parts[1] if len(parts) > 2 and parts[0] == "kb" else ""
+        if lane in ("", "derived"):
+            continue
+        if lane == "normative" and sev != "cited-file-DELETED":
+            continue
+        p = os.path.join(kbroot, kbf)
+        try:
+            src = open(p, encoding="utf-8").read()
+        except OSError:
+            continue
+        fm_end = src.find("\n---", 4)
+        if fm_end < 0:
+            continue
+        m = re.search(r"^status:[ \t]*(\S+)", src[:fm_end], re.M)
+        if not m or m.group(1) == "challenged":
+            continue
+        note = (f"status_note: auto-demoted {now} — cites {path}:{rng} "
+                f"[{sev}] in {pin}..{head}")
+        src = src[:m.start()] + f"status: challenged\n{note}" + src[m.end():]
+        open(p, "w", encoding="utf-8").write(src)
+        demoted.append((kbf, m.group(1), path, rng, sev))
+        log_telemetry(kbroot, "auto_demote", f"{kbf} {m.group(1)}->challenged",
+                      "ship-loop")
+    if demoted:
+        led = os.path.join(kbroot, "ledger")
+        os.makedirs(led, exist_ok=True)
+        with open(os.path.join(led, "trust-decay.md"), "a", encoding="utf-8") as fh:
+            for kbf, old, path, rng, sev in demoted:
+                fh.write(f"{now}  AUTO-DEMOTE  {kbf}  {old} → challenged\n"
+                         f"  evidence: cites {path}:{rng} [{sev}] in {pin}..{head}\n"
+                         f"  reverse-by: speccraft-ratify (founder)\n")
+        print(f"\nAUTO-DEMOTED {len(demoted)} fact(s) to challenged "
+              f"(ledger/trust-decay.md; reverse via speccraft-ratify):")
+        for kbf, old, path, rng, sev in demoted:
+            print(f"  ~ {kbf}  {old} → challenged  [{sev} {path}:{rng}]")
+    return demoted
+
+def anchor_scope_drift(kbroot, repo, pin, head):
+    """Third drift direction: files ADDED since pin that fall under existing
+    facts' directory anchors. --no-renames is load-bearing: a file moved into
+    an anchored scope shows as R with rename detection and would be missed;
+    decomposed, its add side lands here (the delete side is subtractive's).
+    Returns {kb_file: (lane, [(anchor, [added_file, ...]), ...])}."""
+    added = [f for f in sh(["git", "diff", "--name-only", "--no-renames",
+                            "--diff-filter=A", f"{pin}..{head}", "--", ".",
+                            ":(exclude).speccraft"], repo).splitlines() if f]
+    finds = {}
+    if not added:
+        return finds
+    for root, dirs, files in os.walk(kbroot):
+        dirs[:] = [d for d in dirs if d not in {".git", "derived"}]
+        for f in files:
+            if not f.endswith(".md"):
+                continue
+            p = os.path.join(root, f)
+            kbf = os.path.relpath(p, kbroot)
+            anchors = frontmatter(p).get("anchors") or []
+            if isinstance(anchors, str):
+                anchors = [anchors]
+            rows = []
+            for a in anchors:
+                if a.startswith("topic:"):
+                    continue
+                pref = a.rstrip("/") + "/"   # directory-scope match only:
+                hits = sorted(x for x in added if x.startswith(pref))
+                if hits:
+                    rows.append((a, hits))
+            if rows:
+                # deepest anchor first — pointed findings lead, broad trail
+                rows.sort(key=lambda r: -r[0].rstrip("/").count("/"))
+                parts = kbf.split(os.sep)
+                lane = parts[1] if len(parts) > 2 and parts[0] == "kb" else "other"
+                finds[kbf] = (lane, rows)
+    return finds
+
 def additive_findings(added):
     finds = defaultdict(list)   # aspect -> [(path, lineno, snippet)]
     for path, lines in added.items():
@@ -121,6 +227,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--queue", action="store_true")
+    ap.add_argument("--judge-targets", action="store_true")
+    ap.add_argument("--demote", action="store_true",
+                    help="execute the demotion policy on hard subtractive "
+                         "findings (trust-decay spec); ship-loop only")
     args = ap.parse_args()
     cfg = load_config(args.config)
     repo = os.path.expanduser(cfg["repo"])
@@ -129,7 +239,19 @@ def main():
     head = last_code_commit(repo)
 
     if head == pin:
-        print(f"KB pin {pin} == last code commit — nothing stale.")
+        if not args.judge_targets:
+            print(f"KB pin {pin} == last code commit — nothing stale.")
+        return
+
+    scope = anchor_scope_drift(kbroot, repo, pin, head)
+    if args.judge_targets:
+        # machine-readable: normative-anchored scope findings only
+        for kbf, (lane, rows) in sorted(scope.items()):
+            if lane != "normative":
+                continue
+            for a, hits in rows:
+                for x in hits:
+                    print(f"{kbf}\t{a}\t{x}")
         return
 
     n_commits = sh(["git", "rev-list", "--count", f"{pin}..{head}", "--", ".",
@@ -201,7 +323,22 @@ def main():
         for f in dep_changed:
             print(f"  ~ {f}")
 
-    if args.queue and (findings or adds or dep_changed):
+    if scope:
+        print("\nANCHOR SCOPE drift — new files added under anchored paths since pin:")
+        for kbf in sorted(scope, key=lambda k: (scope[k][0] != "normative", k)):
+            lane, rows = scope[kbf]
+            for a, hits in rows:
+                over = f" (+{len(hits) - ADD_CAP} more)" if len(hits) > ADD_CAP else ""
+                print(f"  {kbf}  (anchor: {a}) [{lane}]{over}")
+                for x in hits[:ADD_CAP]:
+                    print(f"    + {x}")
+
+    scope_q = [(kbf, a, hits) for kbf, (lane, rows) in sorted(scope.items())
+               if lane == "normative" for a, hits in rows]
+
+    # dep_changed no longer queues here — dep-diff.py owns dependency queue
+    # items (it has the precise story: package, old→new, affected cards).
+    if args.queue and (findings or adds or scope_q):
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         with open(os.path.join(kbroot, "QUEUE.md"), "a") as fh:
             fh.write(f"\n## Staleness — drift run {now} ({pin}→{head})\n\n")
@@ -212,10 +349,16 @@ def main():
             for aspect in sorted(adds):
                 fh.write(f"- [ ] additive drift [{aspect}]: {len(adds[aspect])} "
                          f"new site(s) — {ASPECT_TARGET[aspect]}\n")
-            for f in dep_changed:
-                fh.write(f"- [ ] dependency drift: `{f}` changed — re-run deps0, "
-                         f"re-verify 09-dependency-practices cards for moved versions\n")
+            for kbf, a, hits in scope_q:   # normative only — founder work,
+                shown = ", ".join(f"`{x}`" for x in hits[:ADD_CAP])   # not context
+                over = f" (+{len(hits) - ADD_CAP} more)" if len(hits) > ADD_CAP else ""
+                fh.write(f"- [ ] anchor scope drift: `{kbf}` — new file(s) in "
+                         f"scope of `{a}`: {shown}{over}. Verify the fact applies "
+                         f"to these files or narrow its anchor.\n")
         print("\nAppended drift items to QUEUE.md")
+
+    if args.demote and findings:
+        demote(kbroot, findings, pin, head)
 
 if __name__ == "__main__":
     main()
