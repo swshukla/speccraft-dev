@@ -17,6 +17,34 @@ git -C "$REPO" rev-parse HEAD >/dev/null 2>&1 || {
 }
 KB="$REPO/.speccraft"
 
+# Migrate a pre-rename KB: repos initialized before the superdev → speccraft
+# rename keep their KB at repo-root superdev/. Rename it (preserving ratified
+# facts, ledger, queue) instead of scaffolding a fresh empty .speccraft/
+# beside it. If BOTH exist, never guess — the human reconciles.
+OLD="$REPO/superdev"
+if [ -d "$OLD" ] && { [ -f "$OLD/kbforge.yaml" ] || [ -d "$OLD/kb" ]; }; then
+  if [ -d "$KB" ]; then
+    echo "WARNING: both superdev/ (pre-rename KB) and .speccraft/ exist in $REPO." >&2
+    echo "         Not migrating — reconcile manually (likely: merge superdev/ facts" >&2
+    echo "         into .speccraft/, then delete superdev/)." >&2
+  else
+    if [ -n "$(git -C "$REPO" ls-files superdev)" ]; then
+      git -C "$REPO" mv superdev .speccraft
+      echo "migrated: superdev/ → .speccraft/ (git mv — staged; commit the rename)"
+    else
+      mv "$OLD" "$KB"
+      echo "migrated: superdev/ → .speccraft/"
+    fi
+    # retire pre-rename procedure files; the installer below lays down the
+    # speccraft-* versions
+    rm -rf "$REPO/.claude/skills/superdev-"* \
+           "$REPO/.codex/prompts/superdev-"*.md \
+           "$REPO/.opencode/command/superdev-"*.md 2>/dev/null || true
+    echo "note: grep AGENTS.md/CLAUDE.md for stale 'superdev' mentions — the"
+    echo "      installer wires the new speccraft sections but does not edit old text."
+  fi
+fi
+
 if [ -f "$KB/kbforge.yaml" ]; then
   echo ".speccraft/ already exists in $REPO — running installer only."
 else

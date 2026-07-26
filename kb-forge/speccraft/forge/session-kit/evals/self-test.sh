@@ -226,6 +226,24 @@ if run_section decay; then
   rm -rf "$RT"
 fi
 
+# ---------- init migration: superdev/ -> .speccraft/ ----------
+if run_section migrate; then
+  KIT="$(cd "$HERE/.." && pwd)"
+  RM=$(mktemp -d); RM=$(cd "$RM" && pwd -P)
+  ( cd "$RM" && git init -q && mkdir -p superdev/kb/normative src \
+    && echo "product: old" > superdev/kbforge.yaml \
+    && printf -- "---\nname: inv\nstatus: ratified\nanchors: [src/]\n---\n# INV-1\n" > superdev/kb/normative/01-inv.md \
+    && echo x > src/app.py && git add -A && git commit -qm oldkb ) >/dev/null 2>&1
+  KBFORGE_HOME="$KIT/.." bash "$KIT/../kbforge-init.sh" "$RM" >/dev/null 2>&1
+  [ -f "$RM/.speccraft/kb/normative/01-inv.md" ] && ok || no "migrate: ratified fact survives superdev -> .speccraft rename"
+  [ ! -d "$RM/superdev" ] && ok || no "migrate: old superdev/ dir gone after rename"
+  mkdir -p "$RM/superdev" && echo "product: old2" > "$RM/superdev/kbforge.yaml"
+  MOUT=$(KBFORGE_HOME="$KIT/.." bash "$KIT/../kbforge-init.sh" "$RM" 2>&1)
+  printf '%s' "$MOUT" | grep -q 'WARNING: both superdev/' && ok || no "migrate: warns when both dirs exist"
+  [ -f "$RM/superdev/kbforge.yaml" ] && ok || no "migrate: never guesses when both exist"
+  rm -rf "$RM"
+fi
+
 if run_section audit; then
   RC=$(mk_repo "$HERE/fixtures/kb-clean")
   OUT=$("$HERE/kb-audit.sh" --root "$RC" --kb "$RC/.speccraft")
