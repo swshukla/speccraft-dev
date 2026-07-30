@@ -283,6 +283,38 @@ if run_section judge; then
   rm -rf "$RC" "$RC2"
 fi
 
+# ---------- section: prove (pull-based proof engine) ----------
+if run_section prove; then
+  RP=$(mk_repo "$HERE/fixtures/kb-clean"); RP=$(cd "$RP" && pwd -P)
+  chmod +x "$HERE/fixtures/bin/claude"
+  MP="$HERE/fixtures/bin"
+  # INV-1 -> POSSIBLY_STALE (exit 10)
+  O1=$(PATH="$MP:$PATH" "$HERE/prove.sh" "$RP" INV-1); R1=$?
+  [ "$R1" -eq 10 ] && ok || no "prove: INV-1 exit 10 (got $R1)"
+  assert_contains "$O1" '^VERDICT: POSSIBLY_STALE$' "prove: INV-1 verdict POSSIBLY_STALE"
+  # INV-2 -> CONTRADICTED (exit 20)
+  O2=$(PATH="$MP:$PATH" "$HERE/prove.sh" "$RP" INV-2); R2=$?
+  [ "$R2" -eq 20 ] && ok || no "prove: INV-2 exit 20 (got $R2)"
+  assert_contains "$O2" '^VERDICT: CONTRADICTED$' "prove: INV-2 verdict CONTRADICTED"
+  # substring resolution -> SUPPORTED (exit 0)
+  O3=$(PATH="$MP:$PATH" "$HERE/prove.sh" "$RP" "retail users"); R3=$?
+  [ "$R3" -eq 0 ] && ok || no "prove: 'retail users' exit 0 (got $R3)"
+  assert_contains "$O3" '^VERDICT: SUPPORTED$' "prove: 'retail users' verdict SUPPORTED"
+  assert_contains "$O3" '^CLAIM: The app targets retail users' "prove: substring resolved to the right claim"
+  # unresolvable substring -> resolution error (exit 2)
+  PATH="$MP:$PATH" "$HERE/prove.sh" "$RP" "zzz-nonexistent" >/dev/null 2>&1; R4=$?
+  [ "$R4" -eq 2 ] && ok || no "prove: unresolvable fact exit 2 (got $R4)"
+  # CODEHASH present and deterministic across two runs of the same fact
+  H1=$(printf '%s\n' "$O1" | grep '^CODEHASH:')
+  [ -n "$H1" ] && ok || no "prove: CODEHASH line present"
+  O1b=$(PATH="$MP:$PATH" "$HERE/prove.sh" "$RP" INV-1)
+  H1b=$(printf '%s\n' "$O1b" | grep '^CODEHASH:')
+  [ "$H1" = "$H1b" ] && ok || no "prove: CODEHASH deterministic across runs ('$H1' vs '$H1b')"
+  # engine renders no artifacts and writes no QUEUE — pure measurement
+  [ ! -d "$RP/.speccraft/proofs" ] && ok || no "prove: engine writes no proofs/ (skill's job)"
+  rm -rf "$RP"
+fi
+
 # ---------- section: behavioral ----------
 if run_section behavioral; then
   CT="$HERE/behavioral/check-tripwires.sh"

@@ -13,7 +13,7 @@ case "$FP" in
     kb_telemetry guard_block "${FP#"$ROOT"/}"
     jq -n '{hookSpecificOutput:{hookEventName:"PreToolUse",
       permissionDecision:"deny",
-      permissionDecisionReason:"KB founder/machine lane. Sessions write only .speccraft/QUEUE.md (append), .speccraft/kb/decisions/, .speccraft/kb/inferred/. Use the speccraft-diverge skill to propose the change — ratification is human-only."}}'
+      permissionDecisionReason:"KB founder/machine lane. Sessions write only .speccraft/QUEUE.md (append), .speccraft/kb/decisions/, .speccraft/kb/inferred/, .speccraft/proofs/. Use the speccraft-diverge skill to propose the change — ratification is human-only."}}'
     ;;
 esac
 exit 0

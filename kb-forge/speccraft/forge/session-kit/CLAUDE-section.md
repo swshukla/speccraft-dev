@@ -22,7 +22,8 @@ Rules for every session:
    fetch, or cross-component call, read `.speccraft/kb/inferred/05-data-sources.md`
    and `06-integrations.md` — the capability may already exist.
 5. **Write lanes.** Sessions may write ONLY to: `.speccraft/QUEUE.md` (append),
-   `.speccraft/kb/decisions/`, `.speccraft/kb/inferred/`. Never
+   `.speccraft/kb/decisions/`, `.speccraft/kb/inferred/`, and `.speccraft/proofs/`
+   (regenerable proof renders from speccraft-prove — never hand-edited). Never
    `.speccraft/kb/normative/`, `.speccraft/kb/derived/`, or `.speccraft/ledger/` —
    founder/machine lanes (a PreToolUse hook enforces this).
 6. **Write-back is automatic.** The post-commit hook runs the ship loop on
