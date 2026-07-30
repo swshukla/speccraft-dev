@@ -31,7 +31,7 @@ if ! mkdir "$LOCK" 2>/dev/null; then exit 0; fi
   python3 "$FORGE/seed0.py"   --config "$KBCFG"
   python3 "$FORGE/assume0.py" --config "$KBCFG"
   python3 "$FORGE/dup0.py"    --config "$KBCFG"
-  python3 "$FORGE/deps0.py"   --config "$KBCFG"
+  python3 "$FORGE/deps0.py"   --config "$KBCFG" --queue
   "$FORGE/session-kit/hooks/kb-status.sh"
   "$FORGE/session-kit/evals/telemetry-report.sh" --kb "$ROOT/.speccraft"
   cd "$ROOT" && git add .speccraft && \

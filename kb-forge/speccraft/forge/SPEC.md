@@ -64,6 +64,8 @@ atomically in one commit, and one clone/push carries both. First deployment:
 | `assume0.py` | Harvest decision residue: TODO/HACK, swallowed excepts, frozen constants, timing/retry values, thresholds, deleted files, reverts → `kb/derived/assumption-residue.md` | no |
 | `dup0.py` | Harvest duplicate/contradiction candidates: same-name multi-module functions (ast + regex), identical-body clones, same-constant-different-values, shared hardcoded hosts → `kb/derived/dup-residue.md`; plus ruff F/B/S at the pin → `kb/derived/lint-report.md` | no |
 | `drift.py` | Two-directional drift vs pin (below) | no |
+| `deps0.py` | Harvest dependency inventory + pinned versions → `kb/derived/dependencies.md`; runs security scanners (pip-audit / npm audit) on a **7-day cadence** (off the per-commit path — see ship loop) and queues advisories that are NEW against unchanged pins | no |
+| `dep-diff.py` | Per-commit: correlate manifest version changes vs the pinned table, flag version-pinned gotcha cards in `kb/inferred/09` that a bump may invalidate; `--queue` tiers card-matched + risk-tagged changes as work (routine bumps stay report-only) | no |
 | `recall.py` | Structural retrieval: match `anchors:` (path prefixes + `topic:` slugs) against files/topics about to be touched; trust-ordered output; explicit NO-COVERAGE warning (doc 06 Ground step) | no |
 | Agent passes | Archaeology / interview / confrontation / extraction — run as Claude Code sessions; read at pin, write `kb/inferred/` or interview → `kb/normative/` | yes |
 
@@ -90,10 +92,19 @@ adjudication like everything else.
 ## The ship loop (write-back-on-ship, doc 06, laptop scale)
 
     finish session → commit in product repo
-      → drift.py --queue   (vs the OLD pin — MUST run before re-pin, else
-                            pin==HEAD and nothing is ever flagged)
-      → seed0.py    (re-pin derived layer)
-      → assume0.py + dup0.py  (re-harvest residue & consistency candidates)
+      → drift.py --queue --demote  (vs the OLD pin — MUST run before re-pin,
+                                    else pin==HEAD and nothing is ever flagged)
+      → dep-diff.py --queue  (manifest bumps vs pinned gotcha cards; parsers
+                              only — network scanners never on this path)
+      → decay.py             (age out stale trust)
+      → seed0.py             (re-pin derived layer)
+      → assume0.py + dup0.py (re-harvest residue & consistency candidates)
+      → deps0.py --queue     (re-pin dependency inventory; the security
+                              scanners run + queue NEW advisories only when the
+                              last scan is >7d old — weekly cadence riding
+                              commit activity, no external cron needed. Force
+                              anytime / in CI: `deps0.py --advisories-only
+                              --queue`)
       → answer QUEUE items when convenient (rulings are commits)
 
 Automated by `session-kit/post-commit` (git hook in the product repo).

@@ -165,6 +165,36 @@ if run_section depdiff; then
   rm -rf "$RP"
 fi
 
+# ---------- deps0 advisory refresh: diff scan, queue only NEW CVEs ----------
+if run_section depsadv; then
+  KIT="$(cd "$HERE/.." && pwd)"
+  RA=$(mktemp -d); RA=$(cd "$RA" && pwd -P)
+  ( cd "$RA" && git init -q && mkdir -p .speccraft/kb/derived \
+    && echo "repo: ." > .speccraft/kbforge.yaml \
+    && printf 'requests==2.0.0\n' > requirements.txt \
+    && git add -A && git commit -qm base ) >/dev/null 2>&1
+  APIN=$(cd "$RA" && git rev-parse --short HEAD)
+  printf -- "---\nname: inventory\nprovenance: derived\nsource_commit: %s\n---\n" "$APIN" \
+    > "$RA/.speccraft/kb/derived/inventory.md"
+  # baseline already knows VULN-1
+  printf '{"last_scan":"2000-01-01","counts":{"python":1,"js":null},"ids":{"python":{"py:requests:VULN-1":"old"},"js":{}}}' \
+    > "$RA/.speccraft/kb/derived/advisories-meta.json"
+  # injected scan: VULN-1 (known) + VULN-2 (new)
+  printf '{"dependencies":[{"name":"requests","version":"2.0.0","vulns":[{"id":"VULN-1","fix_versions":["2.1.0"]},{"id":"VULN-2","fix_versions":["2.2.0"]}]}]}' \
+    > "$RA/newscan.json"
+  AOUT=$(cd "$RA" && python3 "$KIT/../deps0.py" --config .speccraft/kbforge.yaml \
+           --advisories-only --queue --advisory-input python="$RA/newscan.json" 2>&1)
+  grep -q 'deps0-advisory: new python advisory.*VULN-2' "$RA/.speccraft/QUEUE.md" && ok || no "deps0-adv: new CVE queued"
+  grep -q 'VULN-1' "$RA/.speccraft/QUEUE.md" && no "deps0-adv: known CVE wrongly re-queued" || ok
+  [ -f "$RA/.speccraft/kb/derived/dependencies.md" ] && no "deps0-adv: advisories-only wrongly rewrote inventory" || ok
+  # second identical scan must be silent (baseline now holds both IDs)
+  : > "$RA/.speccraft/QUEUE.md"
+  AOUT=$(cd "$RA" && python3 "$KIT/../deps0.py" --config .speccraft/kbforge.yaml \
+           --advisories-only --queue --advisory-input python="$RA/newscan.json" 2>&1)
+  grep -q 'VULN-2' "$RA/.speccraft/QUEUE.md" && no "deps0-adv: unchanged scan re-queued" || ok
+  rm -rf "$RA"
+fi
+
 # ---------- stale commit guard (two-tier) ----------
 if run_section staleguard; then
   KIT="$(cd "$HERE/.." && pwd)"
