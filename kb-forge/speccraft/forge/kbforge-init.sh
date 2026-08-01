@@ -93,6 +93,18 @@ EOF
   echo "seeded .speccraft/ skeleton — EDIT .speccraft/kbforge.yaml (components, risk_paths)"
 fi
 
+# speccraft's skills (kb-ratify, etc.) assume superpowers-style workflow
+# discipline (brainstorming, TDD, systematic-debugging) is available. We
+# don't vendor it — just nudge installation if it's missing from either the
+# user or project plugin config.
+if ! grep -qE '"superpowers@[^"]*"[[:space:]]*:[[:space:]]*true' \
+       "$HOME/.claude/settings.json" "$REPO/.claude/settings.json" 2>/dev/null; then
+  echo "NOTE: superpowers plugin not detected — speccraft's skills assume its"
+  echo "      workflow discipline (brainstorming, TDD, systematic-debugging)."
+  echo "      Install: /plugin marketplace add anthropics/claude-plugins-official"
+  echo "               /plugin install superpowers@claude-plugins-official"
+fi
+
 # mechanical seed (safe to re-run)
 python3 "$FORGE/seed0.py"   --config "$KB/kbforge.yaml"
 python3 "$FORGE/assume0.py" --config "$KB/kbforge.yaml"
