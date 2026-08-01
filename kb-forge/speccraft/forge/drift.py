@@ -193,6 +193,8 @@ def anchor_scope_drift(kbroot, repo, pin, head):
         for f in files:
             if not f.endswith(".md"):
                 continue
+            if f in {"QUEUE.md", "SIGNALS.md", "QUEUE-ARCHIVE.md"}:
+                continue          # never re-ingest our own queue output
             p = os.path.join(root, f)
             kbf = os.path.relpath(p, kbroot)
             anchors = frontmatter(p).get("anchors") or []
@@ -356,14 +358,14 @@ def main():
     if args.queue:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         lines = []
-        for kbf, p, r, sev in hard:
+        for kbf, p, r, sev in sorted(hard):
             lines.append(f"- [ ] re-verify `{kbf}` — cites `{p}:{r}` [{sev}]")
-        for kbf, p, r, sev in soft:
+        for kbf, p, r, sev in sorted(soft):
             lines.append(f"- [ ] spot-check `{kbf}` — cites `{p}:{r}` [file changed elsewhere]")
         for aspect in sorted(adds):
             lines.append(f"- [ ] additive drift [{aspect}]: {len(adds[aspect])} "
                          f"new site(s) — {ASPECT_TARGET[aspect]}")
-        for kbf, a, hits in scope_q:   # normative only — founder work,
+        for kbf, a, hits in sorted(scope_q, key=lambda t: (t[0], t[1])):
             lines.append(_anchor_scope_line(kbf, a, hits))   # not context
         body = f"## drift (pin {pin} → head {head}, {now})\n" + "\n".join(lines)
         prev = set(signals.read_lines(kbroot, "drift"))

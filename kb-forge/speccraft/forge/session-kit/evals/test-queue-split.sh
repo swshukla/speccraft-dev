@@ -103,5 +103,18 @@ SECOND="$(cat "$KB/SIGNALS.md")"
   && ok "no self-citation" || bad "no self-citation"
 grep -q 'signals:drift' "$KB/SIGNALS.md" && ok "drift region present" || bad "drift region present"
 
+echo "== drift idempotency with multiple findings =="
+MKB="$TMP/mkb"; mkdir -p "$MKB/kb/normative" "$MKB/kb/derived"
+printf '# facts\n- svc X (`svc.py:2`)\n- svc Y (`svc.py:4`)\n- more (`svc.py:1`)\n' > "$MKB/kb/normative/00.md"
+printf 'source_commit: %s\n' "$PIN" > "$MKB/kb/derived/inventory.md"
+printf 'repo: %s\n' "$CODE" > "$MKB/kbforge.yaml"
+python3 "$FORGE/drift.py" --config "$MKB/kbforge.yaml" --queue >/dev/null 2>&1 || true
+A="$(cat "$MKB/SIGNALS.md")"
+python3 "$FORGE/drift.py" --config "$MKB/kbforge.yaml" --queue >/dev/null 2>&1 || true
+B="$(cat "$MKB/SIGNALS.md")"
+[ "$A" = "$B" ] && ok 'multi-finding idempotent' || bad 'multi-finding idempotent'
+# and no spurious resolved churn on the identical second run
+[ ! -f "$MKB/QUEUE-ARCHIVE.md" ] || [ ! -s "$MKB/QUEUE-ARCHIVE.md" ] && ok 'no spurious archive churn' || bad 'no spurious archive churn'
+
 echo "signals.py: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
