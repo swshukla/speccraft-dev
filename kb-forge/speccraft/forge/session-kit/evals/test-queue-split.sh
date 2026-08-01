@@ -157,5 +157,50 @@ assert signals.read_lines(dkb, 'drift') == [], signals.read_lines(dkb,'drift')
 print('DEPS_ISOLATION_OK')
 " | grep -q DEPS_ISOLATION_OK && ok "dep-diff writes deps without disturbing drift" || bad "dep-diff writes deps without disturbing drift"
 
+echo "== deps0 advisories go to advisories region, additive =="
+PYME "
+from speccraft.forge import signals
+kb='$TMP'
+# simulate two advisory scans appending distinct CVEs
+signals.write_region(kb, 'advisories', '\n'.join(signals.read_lines(kb,'advisories') + ['- [ ] advisory: CVE-2024-1 in jose']))
+signals.write_region(kb, 'advisories', '\n'.join(signals.read_lines(kb,'advisories') + ['- [ ] advisory: CVE-2024-2 in urllib3']))
+got = signals.read_lines(kb, 'advisories')
+assert got == ['- [ ] advisory: CVE-2024-1 in jose', '- [ ] advisory: CVE-2024-2 in urllib3'], got
+print('ADV_OK')
+" | grep -q ADV_OK && ok "advisories additive in region" || bad "advisories additive"
+
+echo "== deps0.py wires its real advisory scan path to SIGNALS.md advisories region (additive across runs) =="
+ACODE="$TMP/acode"; AKB="$TMP/akb"
+mkdir -p "$ACODE" "$AKB/kb/derived"
+( cd "$ACODE" && git init -q && git config user.email t@t && git config user.name t \
+  && printf 'jose==1.0.0\n' > requirements.txt && git add . && git commit -qm init )
+APIN="$( cd "$ACODE" && git rev-parse --short HEAD )"
+printf 'source_commit: %s\n' "$APIN" > "$AKB/kb/derived/inventory.md"
+printf 'repo: %s\n' "$ACODE" > "$AKB/kbforge.yaml"
+
+# pre-computed pip-audit JSON (--advisory-input bypasses the network scanner,
+# same mechanism the self-test / CI use): scan 1 finds CVE-2024-1 only, scan 2
+# finds CVE-2024-1 (already-baselined) PLUS a genuinely new CVE-2024-2
+AJ1="$TMP/adv1.json"; AJ2="$TMP/adv2.json"
+printf '%s' '{"dependencies": [{"name": "jose", "version": "1.0.0", "vulns": [{"id": "CVE-2024-1", "fix_versions": ["1.0.1"]}]}]}' > "$AJ1"
+printf '%s' '{"dependencies": [{"name": "jose", "version": "1.0.0", "vulns": [{"id": "CVE-2024-1", "fix_versions": ["1.0.1"]}]}, {"name": "urllib3", "version": "2.0.0", "vulns": [{"id": "CVE-2024-2", "fix_versions": ["2.0.1"]}]}]}' > "$AJ2"
+
+python3 "$FORGE/deps0.py" --config "$AKB/kbforge.yaml" --advisories-only --queue --advisory-input python="$AJ1" >/dev/null 2>&1 || true
+python3 "$FORGE/deps0.py" --config "$AKB/kbforge.yaml" --advisories-only --queue --advisory-input python="$AJ2" >/dev/null 2>&1 || true
+
+[ ! -f "$AKB/QUEUE.md" ] || ! grep -q -- '- \[ \]' "$AKB/QUEUE.md" 2>/dev/null \
+  && ok "deps0 advisories wrote no QUEUE.md lines (lane isolation)" || bad "deps0 advisories lane isolation"
+grep -q 'signals:advisories' "$AKB/SIGNALS.md" 2>/dev/null && ok "deps0 advisories region present" || bad "deps0 advisories region present"
+PYME "
+from speccraft.forge import signals
+akb = '$AKB'
+lines = signals.read_lines(akb, 'advisories')
+assert any(l.startswith('- [ ] deps0-advisory:') for l in lines), lines
+assert any('CVE-2024-1' in l for l in lines), lines
+assert any('CVE-2024-2' in l for l in lines), lines
+assert len(lines) == 2, lines
+print('DEPS0_ADV_OK')
+" | grep -q DEPS0_ADV_OK && ok "deps0 real advisory path accumulates additively across two scans" || bad "deps0 real advisory path accumulates additively across two scans"
+
 echo "signals.py: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
