@@ -222,5 +222,30 @@ grep -q -- "- resolved $TODAY:" "$DECKB/QUEUE-ARCHIVE.md" \
     && ok "decay.py keeps recent archive entries" \
     || bad "decay.py keeps recent archive entries"
 
+echo "== kb-briefing.sh: scoped divergence + drift counts (not file-wide) =="
+BKIT="$FORGE/session-kit"
+BRT="$TMP/briefing"; mkdir -p "$BRT/.speccraft/kb/derived" "$BRT/.speccraft/kb/normative"
+( cd "$BRT" && git init -q && git config user.email t@t && git config user.name t \
+  && echo x > README && git add -A && git commit -qm init )
+BPIN="$( cd "$BRT" && git rev-parse --short HEAD )"
+printf 'source_commit: %s\n' "$BPIN" > "$BRT/.speccraft/kb/derived/inventory.md"
+# QUEUE.md: 2 numbered items under ## Open, plus 1 numbered item under ## Ruled
+# that must NOT be counted (proves scoping, not file-wide grep)
+printf '## Open\n1. divergence one\n2. divergence two\n\n## Ruled\n1. this must NOT be counted (wrong lane)\n' \
+  > "$BRT/.speccraft/QUEUE.md"
+printf '# SIGNALS\n<!-- signals:drift -->\n- [ ] drift a\n- [ ] drift b\n- [ ] drift c\n<!-- /signals:drift -->\n' \
+  > "$BRT/.speccraft/SIGNALS.md"
+BOUT=$( cd "$BRT" && KBFORGE_HOME="$BKIT/.." "$BKIT/hooks/kb-briefing.sh" </dev/null )
+echo "$BOUT" | grep -q '2 open divergences | 3 drift signals' \
+  && ok "briefing: scoped divergence+drift counts (2 in ## Open, not 3 file-wide numbered lines)" \
+  || bad "briefing: scoped divergence+drift counts"
+
+# missing SIGNALS.md (fresh KB, no drift run yet) must yield 0, not an error
+rm -f "$BRT/.speccraft/SIGNALS.md"
+BOUT2=$( cd "$BRT" && KBFORGE_HOME="$BKIT/.." "$BKIT/hooks/kb-briefing.sh" </dev/null )
+echo "$BOUT2" | grep -q '2 open divergences | 0 drift signals' \
+  && ok "briefing: missing SIGNALS.md yields 0 drift signals, no error" \
+  || bad "briefing: missing SIGNALS.md yields 0"
+
 echo "signals.py: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

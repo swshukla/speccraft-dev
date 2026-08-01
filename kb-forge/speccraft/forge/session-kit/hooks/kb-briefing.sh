@@ -21,7 +21,8 @@ else
   N=$(git -C "$ROOT" rev-list --count "$PIN..$LASTCODE" -- . ':(exclude).speccraft' 2>/dev/null || echo '?')
   SYNC="$N code commit(s) past pin — derived facts stale until next commit re-pins"
 fi
-OPEN=$(grep -cE '^[0-9]+\.' "$KB/QUEUE.md" 2>/dev/null || echo '?')
+DIV=$(awk '/^## Open/{f=1;next} /^## /{f=0} f && /^[0-9]+\./{n++} END{print n+0}' "$KB/QUEUE.md" 2>/dev/null || echo 0)
+SIG=$(grep -cE '^- \[ \]' "$KB/SIGNALS.md" 2>/dev/null); SIG=${SIG:-0}
 
 # Trust counts (trust-decay spec, Mechanism C — aging is surfaced, never
 # silently acted on). derived/ is excluded: mechanical, not trust-graded.
@@ -41,7 +42,7 @@ TRUST="Trust: ${RAT:-0} ratified | ${PEND:-0} pending${PAGE} | ${CHAL:-0} challe
 
 echo "=== KB BRIEFING (trust-graded product truth: .speccraft/) ==="
 echo "KB pin: $PIN | last code commit: $LASTCODE ($SYNC)"
-echo "Open adjudication items: $OPEN (.speccraft/QUEUE.md)"
+echo "Open adjudication items: ${DIV} open divergences | ${SIG} drift signals (.speccraft/QUEUE.md, .speccraft/SIGNALS.md)"
 echo "$TRUST"
 echo "Ratified invariants (.speccraft/kb/normative/01-invariants.md):"
 grep -E '^#+ *INV-' "$KB/kb/normative/01-invariants.md" 2>/dev/null | sed 's/^#* */  - /' | head -8
