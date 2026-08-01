@@ -26,6 +26,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from deps0 import (parse_pyproject, parse_requirements, parse_poetry_lock,
                    parse_package_json, parse_package_lock, find, RISK, sh)
 from drift import load_config, pinned_sha, last_code_commit
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))))  # kb-forge/ root, for the speccraft package
+from speccraft.forge import signals
 
 MANIFESTS = {"requirements.txt", "pyproject.toml", "poetry.lock",
              "package.json", "package-lock.json", "pnpm-lock.yaml"}
@@ -164,15 +167,23 @@ def main():
     print(f"\nRun deps0.py to re-pin the dependency inventory, then update "
           f"cards for changed packages in {CARDS}.")
 
-    if args.queue and queue_items:
+    if args.queue:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        with open(os.path.join(kbroot, "QUEUE.md"), "a", encoding="utf-8") as fh:
-            fh.write(f"\n## Dependency drift — dep-diff run {now} ({pin}→{head})\n\n")
-            for item in queue_items:
-                fh.write(item + "\n")
-        print(f"\nAppended {len(queue_items)} item(s) to QUEUE.md "
-              f"({len(changed_pkgs) + len(added_pkgs) + len(removed_pkgs) - len(queue_items)} "
-              f"routine change(s) kept report-only)")
+        # queue_items is already deterministic — each entry was appended while
+        # iterating changed_pkgs/added_pkgs/removed_pkgs, which are themselves
+        # built from sorted(...) key sets above, so the projection is
+        # byte-identical across runs with unchanged inputs.
+        if queue_items:
+            body = (f"## Dependency drift — dep-diff run {now} ({pin}→{head})\n\n"
+                     + "\n".join(queue_items))
+        else:
+            body = ""
+        signals.write_region(kbroot, "deps", body)
+        if queue_items:
+            print(f"\nProjected {len(queue_items)} item(s) into SIGNALS.md "
+                  f"deps region "
+                  f"({len(changed_pkgs) + len(added_pkgs) + len(removed_pkgs) - len(queue_items)} "
+                  f"routine change(s) kept report-only)")
 
 if __name__ == "__main__":
     main()

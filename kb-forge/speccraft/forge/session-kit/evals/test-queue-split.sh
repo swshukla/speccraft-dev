@@ -118,5 +118,44 @@ B="$(cat "$MKB/SIGNALS.md")"
 # and no spurious resolved churn on the identical second run
 [ ! -f "$MKB/QUEUE-ARCHIVE.md" ] || [ ! -s "$MKB/QUEUE-ARCHIVE.md" ] && ok 'no spurious archive churn' || bad 'no spurious archive churn'
 
+echo "== dep-diff.py projection (SIGNALS.md deps region, not QUEUE.md) =="
+DCODE="$TMP/dcode"; DKB="$TMP/dkb"
+mkdir -p "$DCODE" "$DKB/kb/derived"
+( cd "$DCODE" && git init -q && git config user.email t@t && git config user.name t \
+  && printf 'requests==2.28.0\n' > requirements.txt && git add . && git commit -qm init )
+DPIN="$( cd "$DCODE" && git rev-parse --short HEAD )"
+printf 'source_commit: %s\n' "$DPIN" > "$DKB/kb/derived/inventory.md"
+printf 'repo: %s\n' "$DCODE" > "$DKB/kbforge.yaml"
+# pinned dependency table as deps0.py would have written it
+printf '## Python (runtime) (1)\n- `requests` @ **2.28.0**\n' > "$DKB/kb/derived/dependencies.md"
+# bump the pinned version at HEAD — requests is RISK-tagged, so this is a real,
+# queue-worthy finding even with no gotcha card mentioning it
+( cd "$DCODE" && printf 'requests==2.31.0\n' > requirements.txt && git commit -qam bump )
+
+python3 "$FORGE/dep-diff.py" --config "$DKB/kbforge.yaml" --queue >/dev/null 2>&1 || true
+DFIRST="$(cat "$DKB/SIGNALS.md" 2>/dev/null || true)"
+python3 "$FORGE/dep-diff.py" --config "$DKB/kbforge.yaml" --queue >/dev/null 2>&1 || true
+DSECOND="$(cat "$DKB/SIGNALS.md" 2>/dev/null || true)"
+
+[ -f "$DKB/SIGNALS.md" ] && ok "dep-diff wrote SIGNALS.md" || bad "dep-diff wrote SIGNALS.md"
+[ ! -f "$DKB/QUEUE.md" ] || ! grep -q -- '- \[ \]' "$DKB/QUEUE.md" 2>/dev/null \
+  && ok "dep-diff wrote no QUEUE.md lines" || bad "dep-diff wrote no QUEUE.md lines"
+grep -q 'signals:deps' "$DKB/SIGNALS.md" 2>/dev/null && ok "deps region present" || bad "deps region present"
+PYME "
+from speccraft.forge import signals
+dkb = '$DKB'
+lines = signals.read_lines(dkb, 'deps')
+assert any(l.startswith('- [ ] dep-diff:') for l in lines), lines
+assert any('requests' in l for l in lines), lines
+print('DEPS_NONVACUOUS_OK')
+" | grep -q DEPS_NONVACUOUS_OK && ok "deps region has a real, non-vacuous finding" || bad "deps region has a real, non-vacuous finding"
+[ "$DFIRST" = "$DSECOND" ] && ok "dep-diff idempotent (byte-identical on rerun)" || bad "dep-diff idempotent"
+PYME "
+from speccraft.forge import signals
+dkb = '$DKB'
+assert signals.read_lines(dkb, 'drift') == [], signals.read_lines(dkb,'drift')
+print('DEPS_ISOLATION_OK')
+" | grep -q DEPS_ISOLATION_OK && ok "dep-diff writes deps without disturbing drift" || bad "dep-diff writes deps without disturbing drift"
+
 echo "signals.py: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
