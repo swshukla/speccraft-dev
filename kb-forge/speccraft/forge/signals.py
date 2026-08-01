@@ -31,23 +31,17 @@ def _path(kbroot):
 
 def _region_bounds(text, region):
     """Return (start, end) char offsets of the whole fenced block for `region`,
-    or None if absent. Parses regions in order to ensure correct matching even
-    if a region's body contains another region's fence-marker text."""
-    bounds = {}
-    pos = 0
-    for r in REGIONS:
-        o_r, c_r = _fence(r)
-        i = text.find(o_r, pos)
-        if i == -1:
-            bounds[r] = None
-            continue
-        j = text.find(c_r, i + len(o_r))
-        if j == -1:
-            bounds[r] = None
-            continue
-        bounds[r] = (i, j + len(c_r))
-        pos = j + len(c_r)  # Continue searching after this region
-    return bounds.get(region)
+    or None if absent. Fences match ONLY when the marker stands alone on a line
+    (via `(?m)^marker$`), so marker text embedded inside a body line is ignored,
+    and each region is located by its own markers independent of physical order."""
+    o, c = _fence(region)
+    om = re.search(r"(?m)^" + re.escape(o) + r"$", text)
+    if not om:
+        return None
+    cm = re.search(r"(?m)^" + re.escape(c) + r"$", text[om.end():])
+    if not cm:
+        return None
+    return om.start(), om.end() + cm.end()
 
 
 def read_region(kbroot, region):

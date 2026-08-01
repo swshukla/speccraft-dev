@@ -56,5 +56,25 @@ assert d == ['- [ ] mentions <!-- signals:deps --> in text'], d
 print('COLLISION_OK')
 " | grep -q COLLISION_OK && ok "fence-collision handled" || bad "fence-collision handled"
 
+echo "== region order-independence =="
+PYME "
+from speccraft.forge import signals
+import os, re
+kb = '$TMP'
+p = os.path.join(kb,'SIGNALS.md')
+if os.path.exists(p): os.remove(p)
+signals.write_region(kb, 'deps', '- [ ] keepdep')
+# remove the drift fence block entirely, simulating a file missing that region
+txt = open(p, encoding='utf-8').read()
+txt = re.sub(r'(?m)^<!-- signals:drift -->\n?<!-- /signals:drift -->\n?', '', txt)
+open(p,'w',encoding='utf-8').write(txt)
+# writing drift now appends it AFTER deps (out of canonical order)
+signals.write_region(kb, 'drift', '- [ ] newdrift')
+# deps must still be readable despite drift now being physically last
+assert signals.read_lines(kb, 'deps') == ['- [ ] keepdep'], signals.read_lines(kb,'deps')
+assert signals.read_lines(kb, 'drift') == ['- [ ] newdrift'], signals.read_lines(kb,'drift')
+print('ORDER_OK')
+" | grep -q ORDER_OK && ok "region order-independence" || bad "region order-independence"
+
 echo "signals.py: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
