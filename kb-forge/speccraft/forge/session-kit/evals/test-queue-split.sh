@@ -80,14 +80,14 @@ echo "== drift.py projection (idempotency / lane isolation / no self-citation) =
 CODE="$TMP/code"; KB="$TMP/kb"
 mkdir -p "$CODE" "$KB/kb/normative" "$KB/kb/derived"
 ( cd "$CODE" && git init -q && git config user.email t@t && git config user.name t \
-  && printf 'a\nb\nc\nd\n' > svc.py && git add . && git commit -qm init )
+  && mkdir -p src && printf 'a\nb\nc\nd\n' > src/svc.py && git add . && git commit -qm init )
 PIN="$( cd "$CODE" && git rev-parse --short HEAD )"
-# a KB fact citing svc.py line 2
-printf '# facts\n- svc does X (`svc.py:2`)\n' > "$KB/kb/normative/00.md"
+# a KB fact citing src/svc.py line 2
+printf '# facts\n- svc does X (`src/svc.py:2`)\n' > "$KB/kb/normative/00.md"
 printf 'source_commit: %s\n' "$PIN" > "$KB/kb/derived/inventory.md"
 printf 'repo: %s\n' "$CODE" > "$KB/kbforge.yaml"
-# change svc.py so line 2's neighborhood shifts -> a drift finding
-( cd "$CODE" && printf 'a\nCHANGED\nb\nc\nd\n' > svc.py && git commit -qam change )
+# change src/svc.py so line 2's neighborhood shifts -> a drift finding
+( cd "$CODE" && printf 'a\nCHANGED\nb\nc\nd\n' > src/svc.py && git commit -qam change )
 
 run_drift() { python3 "$FORGE/drift.py" --config "$KB/kbforge.yaml" --queue >/dev/null 2>&1 || true; }
 run_drift
@@ -102,10 +102,11 @@ SECOND="$(cat "$KB/SIGNALS.md")"
   && ! grep -q 'SIGNALS.md' "$KB/SIGNALS.md" \
   && ok "no self-citation" || bad "no self-citation"
 grep -q 'signals:drift' "$KB/SIGNALS.md" && ok "drift region present" || bad "drift region present"
+grep -qE '^- \[ \]' "$KB/SIGNALS.md" && ok 'drift region has real findings (non-vacuous)' || bad 'drift region has real findings (non-vacuous)'
 
 echo "== drift idempotency with multiple findings =="
 MKB="$TMP/mkb"; mkdir -p "$MKB/kb/normative" "$MKB/kb/derived"
-printf '# facts\n- svc X (`svc.py:2`)\n- svc Y (`svc.py:4`)\n- more (`svc.py:1`)\n' > "$MKB/kb/normative/00.md"
+printf '# facts\n- svc X (`src/svc.py:2`)\n- svc Y (`src/svc.py:4`)\n- more (`src/svc.py:1`)\n' > "$MKB/kb/normative/00.md"
 printf 'source_commit: %s\n' "$PIN" > "$MKB/kb/derived/inventory.md"
 printf 'repo: %s\n' "$CODE" > "$MKB/kbforge.yaml"
 python3 "$FORGE/drift.py" --config "$MKB/kbforge.yaml" --queue >/dev/null 2>&1 || true
@@ -113,6 +114,7 @@ A="$(cat "$MKB/SIGNALS.md")"
 python3 "$FORGE/drift.py" --config "$MKB/kbforge.yaml" --queue >/dev/null 2>&1 || true
 B="$(cat "$MKB/SIGNALS.md")"
 [ "$A" = "$B" ] && ok 'multi-finding idempotent' || bad 'multi-finding idempotent'
+[ "$(grep -cE '^- \[ \]' "$MKB/SIGNALS.md")" -ge 2 ] && ok 'multi-finding produced >=2 real findings' || bad 'multi-finding produced >=2 real findings'
 # and no spurious resolved churn on the identical second run
 [ ! -f "$MKB/QUEUE-ARCHIVE.md" ] || [ ! -s "$MKB/QUEUE-ARCHIVE.md" ] && ok 'no spurious archive churn' || bad 'no spurious archive churn'
 
