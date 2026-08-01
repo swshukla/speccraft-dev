@@ -40,5 +40,21 @@ assert lines == ['- resolved 2026-08-01: kb/x cites y.py:1', '- resolved 2026-08
 print('ARCHIVE_OK')
 " | grep -q ARCHIVE_OK && ok "archive appends" || bad "archive appends"
 
+echo "== fence-collision robustness =="
+PYME "
+from speccraft.forge import signals
+import os
+kb = '$TMP'
+os.remove(os.path.join(kb,'SIGNALS.md')) if os.path.exists(os.path.join(kb,'SIGNALS.md')) else None
+# drift body literally contains the deps OPENING fence marker text
+signals.write_region(kb, 'drift', '## drift\n- [ ] mentions <!-- signals:deps --> in text')
+signals.write_region(kb, 'deps', '- [ ] realdep')
+# both regions must still be independently readable and correct
+assert signals.read_lines(kb, 'deps') == ['- [ ] realdep'], signals.read_lines(kb,'deps')
+d = signals.read_lines(kb, 'drift')
+assert d == ['- [ ] mentions <!-- signals:deps --> in text'], d
+print('COLLISION_OK')
+" | grep -q COLLISION_OK && ok "fence-collision handled" || bad "fence-collision handled"
+
 echo "signals.py: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

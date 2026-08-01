@@ -29,14 +29,38 @@ def _path(kbroot):
     return os.path.join(kbroot, SIGNALS)
 
 
+def _region_bounds(text, region):
+    """Return (start, end) char offsets of the whole fenced block for `region`,
+    or None if absent. Parses regions in order to ensure correct matching even
+    if a region's body contains another region's fence-marker text."""
+    bounds = {}
+    pos = 0
+    for r in REGIONS:
+        o_r, c_r = _fence(r)
+        i = text.find(o_r, pos)
+        if i == -1:
+            bounds[r] = None
+            continue
+        j = text.find(c_r, i + len(o_r))
+        if j == -1:
+            bounds[r] = None
+            continue
+        bounds[r] = (i, j + len(c_r))
+        pos = j + len(c_r)  # Continue searching after this region
+    return bounds.get(region)
+
+
 def read_region(kbroot, region):
     path = _path(kbroot)
     if not os.path.exists(path):
         return ""
-    text = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    b = _region_bounds(text, region)
+    if not b:
+        return ""
     o, c = _fence(region)
-    m = re.search(re.escape(o) + r"\n?(.*?)\n?" + re.escape(c), text, re.S)
-    return m.group(1) if m else ""
+    return text[b[0] + len(o):b[1] - len(c)].strip("\n")
 
 
 def read_lines(kbroot, region):
@@ -57,15 +81,21 @@ def _refresh_header(text):
 
 def write_region(kbroot, region, body):
     path = _path(kbroot)
-    text = open(path, encoding="utf-8").read() if os.path.exists(path) else _skeleton()
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+    else:
+        text = _skeleton()
     o, c = _fence(region)
-    if o not in text:
-        text = text.rstrip("\n") + f"\n\n{o}\n{c}\n"
+    b = _region_bounds(text, region)
     replacement = f"{o}\n{body}\n{c}" if body else f"{o}\n{c}"
-    pat = re.compile(re.escape(o) + r"\n.*?\n?" + re.escape(c), re.S)
-    text = pat.sub(lambda _m: replacement, text)
+    if b:
+        text = text[:b[0]] + replacement + text[b[1]:]
+    else:
+        text = text.rstrip("\n") + f"\n\n{replacement}\n"
     text = _refresh_header(text)
-    open(path, "w", encoding="utf-8").write(text)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
 
 
 def archive_resolved(kbroot, resolved_lines):
