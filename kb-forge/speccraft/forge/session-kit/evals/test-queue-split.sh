@@ -76,5 +76,32 @@ assert signals.read_lines(kb, 'drift') == ['- [ ] newdrift'], signals.read_lines
 print('ORDER_OK')
 " | grep -q ORDER_OK && ok "region order-independence" || bad "region order-independence"
 
+echo "== drift.py projection (idempotency / lane isolation / no self-citation) =="
+CODE="$TMP/code"; KB="$TMP/kb"
+mkdir -p "$CODE" "$KB/kb/normative" "$KB/kb/derived"
+( cd "$CODE" && git init -q && git config user.email t@t && git config user.name t \
+  && printf 'a\nb\nc\nd\n' > svc.py && git add . && git commit -qm init )
+PIN="$( cd "$CODE" && git rev-parse --short HEAD )"
+# a KB fact citing svc.py line 2
+printf '# facts\n- svc does X (`svc.py:2`)\n' > "$KB/kb/normative/00.md"
+printf 'source_commit: %s\n' "$PIN" > "$KB/kb/derived/inventory.md"
+printf 'repo: %s\n' "$CODE" > "$KB/kbforge.yaml"
+# change svc.py so line 2's neighborhood shifts -> a drift finding
+( cd "$CODE" && printf 'a\nCHANGED\nb\nc\nd\n' > svc.py && git commit -qam change )
+
+run_drift() { python3 "$FORGE/drift.py" --config "$KB/kbforge.yaml" --queue >/dev/null 2>&1 || true; }
+run_drift
+FIRST="$(cat "$KB/SIGNALS.md")"
+run_drift
+SECOND="$(cat "$KB/SIGNALS.md")"
+
+[ "$FIRST" = "$SECOND" ] && ok "idempotent (byte-identical on rerun)" || bad "idempotent"
+[ ! -s "$KB/QUEUE.md" ] || ! grep -q -- '- \[ \]' "$KB/QUEUE.md" 2>/dev/null \
+  && ok "lane isolation (no mechanical lines in QUEUE.md)" || bad "lane isolation"
+! grep -Eq 'cites .*(QUEUE|SIGNALS|QUEUE-ARCHIVE)\.md' "$KB/SIGNALS.md" \
+  && ! grep -q 'SIGNALS.md' "$KB/SIGNALS.md" \
+  && ok "no self-citation" || bad "no self-citation"
+grep -q 'signals:drift' "$KB/SIGNALS.md" && ok "drift region present" || bad "drift region present"
+
 echo "signals.py: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
