@@ -202,5 +202,25 @@ assert len(lines) == 2, lines
 print('DEPS0_ADV_OK')
 " | grep -q DEPS0_ADV_OK && ok "deps0 real advisory path accumulates additively across two scans" || bad "deps0 real advisory path accumulates additively across two scans"
 
+echo "== decay.py trims QUEUE-ARCHIVE.md by age, never touches QUEUE.md =="
+DECKB="$TMP/deckb"; mkdir -p "$DECKB"
+printf 'repo: /nonexistent\nqueue_archive_days: 30\n' > "$DECKB/kbforge.yaml"
+printf '## Open\n- [ ] human: does X still hold given Y?\n' > "$DECKB/QUEUE.md"
+TODAY="$(date -u +%Y-%m-%d)"
+printf -- '- resolved 2000-01-01: kb/x cites y.py:1\n- resolved %s: kb/x cites z.py:2\n' \
+    "$TODAY" > "$DECKB/QUEUE-ARCHIVE.md"
+BEFORE_QUEUE="$(cat "$DECKB/QUEUE.md")"
+python3 "$FORGE/decay.py" --config "$DECKB/kbforge.yaml" >/dev/null 2>&1 || true
+AFTER_QUEUE="$(cat "$DECKB/QUEUE.md")"
+[ "$BEFORE_QUEUE" = "$AFTER_QUEUE" ] \
+    && ok "decay.py never touches QUEUE.md (human divergence untouched)" \
+    || bad "decay.py never touches QUEUE.md (human divergence untouched)"
+! grep -q '2000-01-01' "$DECKB/QUEUE-ARCHIVE.md" \
+    && ok "decay.py trims archive entries older than queue_archive_days" \
+    || bad "decay.py trims archive entries older than queue_archive_days"
+grep -q -- "- resolved $TODAY:" "$DECKB/QUEUE-ARCHIVE.md" \
+    && ok "decay.py keeps recent archive entries" \
+    || bad "decay.py keeps recent archive entries"
+
 echo "signals.py: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
