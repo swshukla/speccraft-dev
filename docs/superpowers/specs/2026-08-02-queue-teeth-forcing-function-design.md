@@ -95,10 +95,12 @@ reasons: [...]}` for reuse by the briefing and hook without reparsing.
   it runs `gate.py`. If blocked, it refuses the advance and prints the offending HIGH IDs
   and the override instructions. (Ruling on findings — flipping proposed→confirmed/
   dismissed — is *not* blocked; only the pin advance is.)
-- **Hard backstop — `kb-guard.sh` (the existing KB pre-commit lane guard):** extended so
-  that any commit whose diff changes the `source_commit:` line runs `gate.py` and refuses
-  the commit if blocked (unless a waiver for this pin exists — §4.4). This enforces the
-  gate at the git layer regardless of which tool or agent moves the pin.
+- **Hard backstop — `session-kit/pre-commit` (the git commit-time lane guard):** its
+  `KB_RATIFY` branch is extended so that any commit whose diff changes the `source_commit:`
+  line runs `gate.py` and refuses the commit if blocked (unless a waiver for this pin exists
+  — §4.4). This enforces the gate at the git layer regardless of which tool or agent moves
+  the pin. (Note: `kb-guard.sh` is the earlier *PreToolUse* layer, not the commit chokepoint —
+  the enforcement point is `pre-commit`.)
 
 Both call the same `gate.py` — no duplicated policy.
 
@@ -157,7 +159,7 @@ Bash, in the `session-kit/evals/` harness (a focused `test-queue-teeth.sh`, wire
 | `migrate_findings_raised.py` | **Create** — one-time `Raised` backfill |
 | `session-kit/skills/speccraft-diverge/SKILL.md` | Stamp `Raised` on append |
 | `session-kit/skills/speccraft-ratify/SKILL.md` | Run gate before pin advance; preserve `Raised`; `--accept-debt` waiver flow |
-| `session-kit/hooks/kb-guard.sh` | Run `gate.py` on `source_commit` change; honor waiver |
+| `session-kit/pre-commit` | Run `gate.py` on `source_commit` change; honor waiver |
 | `session-kit/hooks/kb-briefing.sh` | HIGH-debt banner line (first) |
 | `FINDINGS.md` template / header prose | Add `Raised` column to schema + fill-rules |
 | `kbforge.yaml` template | `high_debt_ceiling`, `high_debt_max_age_days` defaults |
