@@ -30,6 +30,17 @@ description: Founder-only — use when the founder wants to answer adjudication 
    - **Hypothesis killed** → mark it killed in place with a one-line reason
      (do not delete — the kill is part of the record).
 4. Move each answered item to `## Ruled — <date>` in QUEUE.md with a one-line
-   summary and where the ruling landed.
+   summary and where the ruling landed. After advancing the `source_commit` pin
+   in `kb/derived/inventory.md`, re-run the drift projection so `SIGNALS.md`
+   reflects the new pin:
+
+   ```
+   python3 <forge>/drift.py --config <kbroot>/kbforge.yaml --queue
+   ```
+
+   This is the existing drift command — no new mechanism. Findings resolved by
+   the new pin drop out of `SIGNALS.md` automatically and are recorded in
+   `QUEUE-ARCHIVE.md`.
+
 5. Commit: `KB_RATIFY=1 git commit -m "kb: rulings <date>" -- .speccraft`
    (the pre-commit lane guard requires the flag for normative/ledger writes).

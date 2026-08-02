@@ -16,6 +16,10 @@ description: Use when the task at hand requires violating or contradicting a rat
       line>. Proposed ruling: fix-code | fix-model | accepted-deviation.
    ```
 
+   Divergences are recorded ONLY in `QUEUE.md` under `## Open` (the human lane).
+   Never write to `SIGNALS.md` — that file is a machine-owned projection of drift,
+   rewritten on every drift run, and any hand-edit will be overwritten.
+
 3. If the divergence is a defect (crash, data loss, security, wrong behaviour,
    ledger-integrity), also append a `proposed` BUG-NNN row to
    `.speccraft/findings/FINDINGS.md` (severity + evidence `path:line` + source),

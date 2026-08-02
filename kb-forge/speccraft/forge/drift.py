@@ -41,6 +41,9 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from recall import frontmatter, log_telemetry  # shared parser + telemetry
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))))  # kb-forge/ root, for the speccraft package
+from speccraft.forge import signals
 
 CITE = re.compile(r"([\w@./-]+/[\w.-]+\.(?:py|tsx|ts|jsx|js|md|yaml|yml|toml|sql)):(\d+)(?:-(\d+))?")
 HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
@@ -190,6 +193,8 @@ def anchor_scope_drift(kbroot, repo, pin, head):
         for f in files:
             if not f.endswith(".md"):
                 continue
+            if f in {"QUEUE.md", "SIGNALS.md", "QUEUE-ARCHIVE.md"}:
+                continue          # never re-ingest our own queue output
             p = os.path.join(root, f)
             kbf = os.path.relpath(p, kbroot)
             anchors = frontmatter(p).get("anchors") or []
@@ -223,6 +228,16 @@ def additive_findings(added):
                     break
     return finds
 
+def _anchor_scope_line(kbf, a, hits):
+    """Verbatim rendering lifted from the old QUEUE.md writer (anchor-scope
+    finding text) so the projected line is byte-for-byte identical."""
+    shown = ", ".join(f"`{x}`" for x in hits[:ADD_CAP])   # not context
+    over = f" (+{len(hits) - ADD_CAP} more)" if len(hits) > ADD_CAP else ""
+    return (f"- [ ] anchor scope drift: `{kbf}` — new file(s) in "
+            f"scope of `{a}`: {shown}{over}. Verify the fact applies "
+            f"to these files or narrow its anchor.")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
@@ -238,7 +253,7 @@ def main():
     pin = pinned_sha(kbroot)
     head = last_code_commit(repo)
 
-    if head == pin:
+    if head == pin and not args.queue:
         if not args.judge_targets:
             print(f"KB pin {pin} == last code commit — nothing stale.")
         return
@@ -267,6 +282,8 @@ def main():
         for f in files:
             if not f.endswith(".md"):
                 continue
+            if f in {"QUEUE.md", "SIGNALS.md", "QUEUE-ARCHIVE.md"}:
+                continue          # never re-ingest our own queue output
             kbf = os.path.relpath(os.path.join(root, f), kbroot)
             src = open(os.path.join(root, f), encoding="utf-8").read()
             for m in CITE.finditer(src):
@@ -338,24 +355,23 @@ def main():
 
     # dep_changed no longer queues here — dep-diff.py owns dependency queue
     # items (it has the precise story: package, old→new, affected cards).
-    if args.queue and (findings or adds or scope_q):
+    if args.queue:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        with open(os.path.join(kbroot, "QUEUE.md"), "a") as fh:
-            fh.write(f"\n## Staleness — drift run {now} ({pin}→{head})\n\n")
-            for kbf, p, r, sev in hard:
-                fh.write(f"- [ ] re-verify `{kbf}` — cites `{p}:{r}` [{sev}]\n")
-            for kbf, p, r, sev in soft:
-                fh.write(f"- [ ] spot-check `{kbf}` — cites `{p}:{r}` [file changed elsewhere]\n")
-            for aspect in sorted(adds):
-                fh.write(f"- [ ] additive drift [{aspect}]: {len(adds[aspect])} "
-                         f"new site(s) — {ASPECT_TARGET[aspect]}\n")
-            for kbf, a, hits in scope_q:   # normative only — founder work,
-                shown = ", ".join(f"`{x}`" for x in hits[:ADD_CAP])   # not context
-                over = f" (+{len(hits) - ADD_CAP} more)" if len(hits) > ADD_CAP else ""
-                fh.write(f"- [ ] anchor scope drift: `{kbf}` — new file(s) in "
-                         f"scope of `{a}`: {shown}{over}. Verify the fact applies "
-                         f"to these files or narrow its anchor.\n")
-        print("\nAppended drift items to QUEUE.md")
+        lines = []
+        for kbf, p, r, sev in sorted(hard):
+            lines.append(f"- [ ] re-verify `{kbf}` — cites `{p}:{r}` [{sev}]")
+        for kbf, p, r, sev in sorted(soft):
+            lines.append(f"- [ ] spot-check `{kbf}` — cites `{p}:{r}` [file changed elsewhere]")
+        for aspect in sorted(adds):
+            lines.append(f"- [ ] additive drift [{aspect}]: {len(adds[aspect])} "
+                         f"new site(s) — {ASPECT_TARGET[aspect]}")
+        for kbf, a, hits in sorted(scope_q, key=lambda t: (t[0], t[1])):
+            lines.append(_anchor_scope_line(kbf, a, hits))   # not context
+        body = f"## drift (pin {pin} → head {head}, {now})\n" + "\n".join(lines)
+        prev = set(signals.read_lines(kbroot, "drift"))
+        resolved = [f"- resolved {now}: {ln[6:]}" for ln in sorted(prev - set(lines))]
+        signals.archive_resolved(kbroot, resolved)
+        signals.write_region(kbroot, "drift", body)
 
     if args.demote and findings:
         demote(kbroot, findings, pin, head)

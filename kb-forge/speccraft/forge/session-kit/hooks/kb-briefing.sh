@@ -21,7 +21,8 @@ else
   N=$(git -C "$ROOT" rev-list --count "$PIN..$LASTCODE" -- . ':(exclude).speccraft' 2>/dev/null || echo '?')
   SYNC="$N code commit(s) past pin — derived facts stale until next commit re-pins"
 fi
-OPEN=$(grep -cE '^[0-9]+\.' "$KB/QUEUE.md" 2>/dev/null || echo '?')
+DIV=$(awk '/^## Open/{f=1;next} /^## /{f=0} f && /^[0-9]+\./{n++} END{print n+0}' "$KB/QUEUE.md" 2>/dev/null || echo 0)
+SIG=$(grep -cE '^- \[ \]' "$KB/SIGNALS.md" 2>/dev/null); SIG=${SIG:-0}
 
 # Trust counts (trust-decay spec, Mechanism C — aging is surfaced, never
 # silently acted on). derived/ is excluded: mechanical, not trust-graded.
@@ -41,10 +42,10 @@ TRUST="Trust: ${RAT:-0} ratified | ${PEND:-0} pending${PAGE} | ${CHAL:-0} challe
 
 echo "=== KB BRIEFING (trust-graded product truth: .speccraft/) ==="
 echo "KB pin: $PIN | last code commit: $LASTCODE ($SYNC)"
-echo "Open adjudication items: $OPEN (.speccraft/QUEUE.md)"
+echo "Open adjudication items: ${DIV} open divergences | ${SIG} drift signals (.speccraft/QUEUE.md, .speccraft/SIGNALS.md)"
 echo "$TRUST"
 echo "Ratified invariants (.speccraft/kb/normative/01-invariants.md):"
 grep -E '^#+ *INV-' "$KB/kb/normative/01-invariants.md" 2>/dev/null | sed 's/^#* */  - /' | head -8
 echo "RECALL GATE: an automated gate may deny your FIRST edit to a file governed by ratified facts, attaching those facts — expected repo machinery, not user input. Re-issue the edit honoring the facts. Running speccraft-recall before touching a module avoids the bounce entirely."
-echo "PROCEDURES (use the skills): speccraft-interview to seed intent+invariants (do this first on a fresh KB); speccraft-recall before touching a module; speccraft-decide when making a tradeoff; speccraft-diverge on conflict with a ratified fact; speccraft-ratify is founder-only. Raw recall: python3 $FORGE/recall.py --config .speccraft/kbforge.yaml --files <repo-relative paths>. Write lanes for sessions: .speccraft/QUEUE.md (append), .speccraft/kb/decisions/, .speccraft/kb/inferred/ ONLY."
+echo "PROCEDURES (use the skills): speccraft-interview to seed intent+invariants (do this first on a fresh KB); speccraft-recall before touching a module; speccraft-decide when making a tradeoff; speccraft-diverge on conflict with a ratified fact; speccraft-ratify is founder-only. Raw recall: python3 $FORGE/recall.py --config .speccraft/kbforge.yaml --files <repo-relative paths>. Write lanes for sessions: .speccraft/QUEUE.md holds human divergences under ## Open (append), .speccraft/kb/decisions/, .speccraft/kb/inferred/ ONLY. .speccraft/SIGNALS.md is machine-owned — rewritten by drift/dep-diff runs, never hand-edit."
 exit 0

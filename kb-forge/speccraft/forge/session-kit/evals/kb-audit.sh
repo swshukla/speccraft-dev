@@ -4,13 +4,32 @@
 # Usage: kb-audit.sh [--kb <.speccraft-dir>] [--root <repo-root>] [--judge]
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
-KB=""; ROOT=""; JUDGE=0
+KB=""; ROOT=""; JUDGE=0; APPEND_TEST=""
+# insert "$1" as the next-numbered item at the end of QUEUE.md's ## Open
+# section (numbering scoped to that section, never a file-wide count, and
+# never appended past arbitrary end-of-file). Test-only entry point below
+# (--append-test) exercises this without a full eval run.
+queue_insert_open(){
+  local text="$1" n
+  n=$(awk '/^## Open/{o=1;next}/^## /{o=0}o&&/^[0-9]+\./{c++}END{print c+1}' "$KB/QUEUE.md")
+  awk -v n="$n" -v t="$text" '
+    /^## Open/{o=1; print; next}
+    o && /^## /{print n". "t; print ""; o=0}
+    {print}
+    END{ if(o) print n". "t }
+  ' "$KB/QUEUE.md" > "$KB/QUEUE.md.tmp" && mv "$KB/QUEUE.md.tmp" "$KB/QUEUE.md"
+}
 while [ $# -gt 0 ]; do case "$1" in
   --kb) KB=$2; shift 2;; --root) ROOT=$2; shift 2;; --judge) JUDGE=1; shift;;
+  --append-test) APPEND_TEST=$2; shift 2;;
   *) echo "unknown arg: $1" >&2; exit 2;;
 esac; done
 [ -n "$ROOT" ] || ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 [ -n "$KB" ] || KB="$ROOT/.speccraft"
+if [ -n "$APPEND_TEST" ]; then
+  queue_insert_open "$APPEND_TEST"
+  exit 0
+fi
 [ -d "$KB/kb" ] || exit 0
 LEGAL='ratified|ratified-partial|observed|pending-ratification|challenged'
 ISSUES=(); note(){ ISSUES+=("$1"); }
@@ -106,11 +125,10 @@ if [ "$JUDGE" -eq 1 ]; then
       NT=$(jq 'length' <<<"$VERD")
       PRECISION=$(awk "BEGIN{printf \"%.2f\", $NT ? $NS/$NT : 0}")
       SEM_LINES=$(jq -r '.[] | "- \(.verdict): \(.claim) [\(.file)] — \(.evidence)"' <<<"$VERD")
-      # route non-SUPPORTED verdicts to QUEUE (session lane; append-only)
-      N=$(grep -cE '^[0-9]+\.' "$KB/QUEUE.md" 2>/dev/null); N=${N:-0}
+      # route non-SUPPORTED verdicts to QUEUE (session lane; scoped to ## Open)
       while read -r line; do
         [ -z "$line" ] && continue
-        N=$((N+1)); echo "$N. [evals-audit $(date +%F)] $line" >> "$KB/QUEUE.md"
+        queue_insert_open "[evals-audit $(date +%F)] $line"
       done <<<"$(jq -r '.[] | select(.verdict!="SUPPORTED")
         | "\(.verdict): \(.claim) [\(.file)] — \(.evidence)"' <<<"$VERD")"
       # upsert health line

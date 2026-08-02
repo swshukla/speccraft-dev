@@ -19,6 +19,10 @@ Usage: python3 deps0.py --config /path/to/<product>-kb/kbforge.yaml
 import argparse, json, os, re, shutil, subprocess, sys, tempfile
 from datetime import date
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))))  # kb-forge/ root, for the speccraft package
+from speccraft.forge import signals
+
 RISK = re.compile(r"razorpay|stripe|paypal|jwt|jose|passlib|bcrypt|oauth|"
                   r"crypto|telegram|boto3|sqlalchemy|alembic|celery|redis|"
                   r"httpx|requests|aiohttp|pydantic|fastapi|next|react", re.I)
@@ -269,10 +273,9 @@ def refresh_advisories(kbroot, snap, inputs, queue):
     json.dump(meta, open(_meta_path(kbroot), "w"), indent=2)
 
     if queue and new_items:
-        with open(os.path.join(kbroot, "QUEUE.md"), "a", encoding="utf-8") as fh:
-            fh.write(f"\n## Security advisories — deps0 scan {date.today().isoformat()}\n\n")
-            for it in new_items:
-                fh.write(it + "\n")
+        existing = signals.read_lines(kbroot, "advisories")
+        body = "## advisories\n" + "\n".join(existing + new_items)
+        signals.write_region(kbroot, "advisories", body)
     return meta, new_items
 
 def advisories_section(kbroot):
@@ -301,7 +304,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--queue", action="store_true",
-                    help="append NEW advisories to QUEUE.md")
+                    help="append NEW advisories to the SIGNALS.md advisories region")
     ap.add_argument("--advisories-only", action="store_true",
                     help="skip the inventory rewrite; force an advisory "
                          "scan+diff+queue regardless of cadence (CI / manual)")
