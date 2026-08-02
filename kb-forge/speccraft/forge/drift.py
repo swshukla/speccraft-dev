@@ -253,7 +253,7 @@ def main():
     pin = pinned_sha(kbroot)
     head = last_code_commit(repo)
 
-    if head == pin:
+    if head == pin and not args.queue:
         if not args.judge_targets:
             print(f"KB pin {pin} == last code commit — nothing stale.")
         return

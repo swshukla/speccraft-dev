@@ -304,7 +304,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--queue", action="store_true",
-                    help="append NEW advisories to QUEUE.md")
+                    help="append NEW advisories to the SIGNALS.md advisories region")
     ap.add_argument("--advisories-only", action="store_true",
                     help="skip the inventory rewrite; force an advisory "
                          "scan+diff+queue regardless of cadence (CI / manual)")

@@ -108,12 +108,16 @@ def main():
     changed = sh(["git", "diff", "--name-only", f"{pin}..{head}", "--", ".",
                   ":(exclude).speccraft"], repo).splitlines()
     if not any(os.path.basename(f) in MANIFESTS for f in changed):
+        if args.queue:
+            signals.write_region(kbroot, "deps", "")
         return
 
     old, new = pinned_table(kbroot), head_table(repo)
     if not old:
         print("dep-diff: no pinned table (kb/derived/dependencies.md missing "
               "or empty) — run deps0.py to establish the baseline.")
+        if args.queue:
+            signals.write_region(kbroot, "deps", "")
         return
 
     changed_pkgs = [(k, old[k], new[k]) for k in sorted(old.keys() & new.keys())
@@ -121,6 +125,8 @@ def main():
     added_pkgs = sorted(new.keys() - old.keys())
     removed_pkgs = sorted(old.keys() - new.keys())
     if not (changed_pkgs or added_pkgs or removed_pkgs):
+        if args.queue:
+            signals.write_region(kbroot, "deps", "")
         return   # manifest touched but no version movement (comments, etc.)
 
     print(f"=== DEPENDENCY DIFF (pin {pin} → HEAD {head}) ===\n")

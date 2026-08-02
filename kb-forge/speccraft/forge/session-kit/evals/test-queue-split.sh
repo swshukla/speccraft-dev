@@ -104,6 +104,17 @@ SECOND="$(cat "$KB/SIGNALS.md")"
 grep -q 'signals:drift' "$KB/SIGNALS.md" && ok "drift region present" || bad "drift region present"
 grep -qE '^- \[ \]' "$KB/SIGNALS.md" && ok 'drift region has real findings (non-vacuous)' || bad 'drift region has real findings (non-vacuous)'
 
+echo "== drift.py re-projects on ratify (pin advances to head): resolved findings clear + archive =="
+# simulate speccraft-ratify: advance the pin to HEAD (the normal post-ratify state)
+printf 'source_commit: %s\n' "$( cd "$CODE" && git rev-parse --short HEAD )" > "$KB/kb/derived/inventory.md"
+run_drift
+! grep -qE '^- \[ \]' "$KB/SIGNALS.md" \
+  && ok "drift region cleared once pin == head (re-projected empty)" \
+  || bad "drift region cleared once pin == head (re-projected empty)"
+grep -q -- '- resolved ' "$KB/QUEUE-ARCHIVE.md" 2>/dev/null \
+  && ok "prior drift finding archived to QUEUE-ARCHIVE.md" \
+  || bad "prior drift finding archived to QUEUE-ARCHIVE.md"
+
 echo "== drift idempotency with multiple findings =="
 MKB="$TMP/mkb"; mkdir -p "$MKB/kb/normative" "$MKB/kb/derived"
 printf '# facts\n- svc X (`src/svc.py:2`)\n- svc Y (`src/svc.py:4`)\n- more (`src/svc.py:1`)\n' > "$MKB/kb/normative/00.md"
@@ -156,6 +167,19 @@ dkb = '$DKB'
 assert signals.read_lines(dkb, 'drift') == [], signals.read_lines(dkb,'drift')
 print('DEPS_ISOLATION_OK')
 " | grep -q DEPS_ISOLATION_OK && ok "dep-diff writes deps without disturbing drift" || bad "dep-diff writes deps without disturbing drift"
+
+echo "== dep-diff.py self-clears deps region once version drift resolves (no manifest movement vs pin) =="
+# advance the pin to HEAD so there is no more manifest diff — the previously
+# written deps finding must vanish, not linger forever (decay.py no longer
+# cleans SIGNALS.md, so dep-diff itself must self-clear on re-run)
+printf 'source_commit: %s\n' "$( cd "$DCODE" && git rev-parse --short HEAD )" > "$DKB/kb/derived/inventory.md"
+python3 "$FORGE/dep-diff.py" --config "$DKB/kbforge.yaml" --queue >/dev/null 2>&1 || true
+PYME "
+from speccraft.forge import signals
+dkb = '$DKB'
+assert signals.read_lines(dkb, 'deps') == [], signals.read_lines(dkb,'deps')
+print('DEPS_SELFCLEAR_OK')
+" | grep -q DEPS_SELFCLEAR_OK && ok "dep-diff self-clears deps region once version drift resolves" || bad "dep-diff self-clears deps region once version drift resolves"
 
 echo "== deps0 advisories go to advisories region, additive =="
 PYME "
