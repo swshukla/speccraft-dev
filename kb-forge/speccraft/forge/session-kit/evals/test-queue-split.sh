@@ -259,5 +259,31 @@ bash "$FORGE/session-kit/evals/kb-audit.sh" --kb "$QKB" --append-test "audited: 
 grep -qE '^2\. .*sample finding' "$QKB/QUEUE.md" && ok "scoped numbering (2)" || bad "scoped numbering"
 awk '/^## Open/{o=1;next}/^## /{o=0}o&&/sample finding/{f=1}END{exit !f}' "$QKB/QUEUE.md" && ok "inserted inside ## Open" || bad "inserted inside ## Open"
 
+echo "== migration keeps human lane, drops mechanical sections =="
+MKB="$TMP/mkb"; mkdir -p "$MKB"
+cat > "$MKB/QUEUE.md" <<'EOF'
+## Open
+
+1. real divergence (INV-5)
+
+## Ruled — 2026-07-19
+
+- a ruling
+
+## Staleness — drift run 2026-07-25 (a→b)
+
+- [ ] spot-check `QUEUE.md` — cites `x.py:1` [file changed elsewhere]
+
+## Dependency drift — dep-diff run 2026-07-25 (a→b)
+
+- [ ] dep-diff: bumped foo
+EOF
+python3 "$FORGE/migrate_split_queue.py" "$MKB/QUEUE.md"
+grep -q 'real divergence' "$MKB/QUEUE.md" && ok "migration keeps ## Open" || bad "migration keeps ## Open"
+grep -q 'a ruling' "$MKB/QUEUE.md" && ok "migration keeps ## Ruled" || bad "migration keeps ## Ruled"
+! grep -q 'Staleness — drift run' "$MKB/QUEUE.md" && ok "migration drops staleness" || bad "migration drops staleness"
+! grep -q 'Dependency drift' "$MKB/QUEUE.md" && ok "migration drops dep drift" || bad "migration drops dep drift"
+! grep -q 'cites `QUEUE.md`' "$MKB/QUEUE.md" && ok "migration drops self-citation garbage" || bad "migration drops self-citation"
+
 echo "signals.py: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
