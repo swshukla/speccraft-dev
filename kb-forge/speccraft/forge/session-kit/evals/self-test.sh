@@ -131,8 +131,14 @@ if run_section drift; then
   printf '%s' "$DOUT" | grep -q 'src/workers/new.py' && ok || no "drift: new nested file caught"
   printf '%s' "$DOUT" | grep -q 'docs/moved.md' && ok || no "drift: rename into scope caught (--no-renames)"
   printf '%s' "$DOUT" | grep -q 'rootnew.py' && no "drift: unrelated new file wrongly reported" || ok
-  grep -q 'anchor scope drift: `kb/normative/02-scope.md`' "$RD/.speccraft/QUEUE.md" && ok || no "drift: normative scope finding queued"
-  grep -q 'anchor scope drift: `kb/inferred/09-scope.md`' "$RD/.speccraft/QUEUE.md" && no "drift: inferred scope finding wrongly queued" || ok
+  SIGOUT=$(cd "$RD" && python3 -c "
+import sys; sys.path.insert(0, '$KIT/../../..')
+from speccraft.forge import signals
+print('\n'.join(signals.read_lines('.speccraft', 'drift')))
+")
+  printf '%s' "$SIGOUT" | grep -q 'anchor scope drift: `kb/normative/02-scope.md`' && ok || no "drift: normative scope finding signaled"
+  printf '%s' "$SIGOUT" | grep -q 'anchor scope drift: `kb/inferred/09-scope.md`' && no "drift: inferred scope finding wrongly signaled" || ok
+  grep -q 'anchor scope drift' "$RD/.speccraft/QUEUE.md" 2>/dev/null && no "drift: mechanical finding leaked into QUEUE.md" || ok
   JT=$(cd "$RD" && python3 "$KIT/../drift.py" --config .speccraft/kbforge.yaml --judge-targets)
   printf '%s\n' "$JT" | grep -q "^kb/normative/02-scope.md	src/	src/workers/new.py$" && ok || no "drift: judge-targets line exact"
   printf '%s' "$JT" | grep -q 'inferred' && no "drift: judge-targets leaked non-normative" || ok
@@ -160,8 +166,14 @@ if run_section depdiff; then
   DOUT=$(cd "$RP" && python3 "$KIT/../dep-diff.py" --config .speccraft/kbforge.yaml --queue 2>&1)
   printf '%s' "$DOUT" | grep -q 'stripe  5.0.0 → 6.0.0' && ok || no "dep-diff: changed version detected"
   printf '%s' "$DOUT" | grep -q 'mentions `stripe`' && ok || no "dep-diff: backticked card match"
-  grep -q 'dep-diff: `stripe` 5.0.0 → 6.0.0' "$RP/.speccraft/QUEUE.md" && ok || no "dep-diff: card-matched change queued"
-  grep -q 'dep-diff: `click`' "$RP/.speccraft/QUEUE.md" && no "dep-diff: routine bump wrongly queued" || ok
+  DEPSIG=$(cd "$RP" && python3 -c "
+import sys; sys.path.insert(0, '$KIT/../../..')
+from speccraft.forge import signals
+print('\n'.join(signals.read_lines('.speccraft', 'deps')))
+")
+  printf '%s' "$DEPSIG" | grep -q 'dep-diff: `stripe` 5.0.0 → 6.0.0' && ok || no "dep-diff: card-matched change signaled"
+  printf '%s' "$DEPSIG" | grep -q 'dep-diff: `click`' && no "dep-diff: routine bump wrongly signaled" || ok
+  grep -q 'dep-diff:' "$RP/.speccraft/QUEUE.md" 2>/dev/null && no "dep-diff: mechanical finding leaked into QUEUE.md" || ok
   rm -rf "$RP"
 fi
 
@@ -184,14 +196,22 @@ if run_section depsadv; then
     > "$RA/newscan.json"
   AOUT=$(cd "$RA" && python3 "$KIT/../deps0.py" --config .speccraft/kbforge.yaml \
            --advisories-only --queue --advisory-input python="$RA/newscan.json" 2>&1)
-  grep -q 'deps0-advisory: new python advisory.*VULN-2' "$RA/.speccraft/QUEUE.md" && ok || no "deps0-adv: new CVE queued"
-  grep -q 'VULN-1' "$RA/.speccraft/QUEUE.md" && no "deps0-adv: known CVE wrongly re-queued" || ok
+  ADVSIG(){ cd "$RA" && python3 -c "
+import sys; sys.path.insert(0, '$KIT/../../..')
+from speccraft.forge import signals
+print('\n'.join(signals.read_lines('.speccraft', 'advisories')))
+"; }
+  ASIG1=$(ADVSIG)
+  printf '%s' "$ASIG1" | grep -q 'deps0-advisory: new python advisory.*VULN-2' && ok || no "deps0-adv: new CVE signaled"
+  printf '%s' "$ASIG1" | grep -q 'VULN-1' && no "deps0-adv: known CVE wrongly re-signaled" || ok
+  grep -q 'VULN' "$RA/.speccraft/QUEUE.md" 2>/dev/null && no "deps0-adv: mechanical finding leaked into QUEUE.md" || ok
   [ -f "$RA/.speccraft/kb/derived/dependencies.md" ] && no "deps0-adv: advisories-only wrongly rewrote inventory" || ok
   # second identical scan must be silent (baseline now holds both IDs)
-  : > "$RA/.speccraft/QUEUE.md"
   AOUT=$(cd "$RA" && python3 "$KIT/../deps0.py" --config .speccraft/kbforge.yaml \
            --advisories-only --queue --advisory-input python="$RA/newscan.json" 2>&1)
-  grep -q 'VULN-2' "$RA/.speccraft/QUEUE.md" && no "deps0-adv: unchanged scan re-queued" || ok
+  ASIG2=$(ADVSIG)
+  N2=$(printf '%s\n' "$ASIG2" | grep -c 'VULN-2')
+  [ "$N2" -eq 1 ] && ok || no "deps0-adv: unchanged scan re-signaled (got $N2 VULN-2 lines)"
   rm -rf "$RA"
 fi
 
@@ -236,7 +256,7 @@ if run_section decay; then
     && printf -- "---\nname: i1\nstatus: observed\nanchors: [src/]\n---\nsee src/gone.py:1-2\n" > .speccraft/kb/inferred/05-a.md \
     && printf -- "---\nname: n1\nstatus: ratified\nanchors: [src/]\n---\ncites src/ed.py:1-2\n" > .speccraft/kb/normative/01-i.md \
     && printf -- "---\nname: n2\nstatus: ratified\nanchors: [src/]\n---\ncites src/gone.py:1\n" > .speccraft/kb/normative/02-i.md \
-    && printf -- "## Adjudication — 2026-06-01\n\n- [ ] divergence: keep me\n\n## Staleness — drift run 2026-06-10 (a→b)\n\n- [ ] re-verify \`kb/x.md\` — cites \`src/o.py:1\`\n" > .speccraft/QUEUE.md \
+    && printf -- "## Adjudication — 2026-06-01\n\n- [ ] divergence: keep me\n" > .speccraft/QUEUE.md \
     && git add -A && git commit -qm base ) >/dev/null 2>&1
   TPIN=$(cd "$RT" && git rev-parse --short HEAD)
   printf -- "---\nname: inventory\nprovenance: derived\nsource_commit: %s\n---\n" "$TPIN" > "$RT/.speccraft/kb/derived/inventory.md"
@@ -248,10 +268,19 @@ if run_section decay; then
   grep -q 'status: challenged' "$RT/.speccraft/kb/normative/02-i.md" && ok || no "decay: ratified fact citing DELETED file demoted"
   grep -q 'AUTO-DEMOTE' "$RT/.speccraft/ledger/trust-decay.md" && ok || no "decay: ledger entry written"
   grep -q 'status_note: auto-demoted' "$RT/.speccraft/kb/inferred/05-a.md" && ok || no "decay: status_note carries evidence"
+  # decay.py: trims QUEUE-ARCHIVE.md `- resolved <date>:` lines older than
+  # queue_archive_days; never touches QUEUE.md (the human adjudication lane).
+  echo "queue_archive_days: 30" >> "$RT/.speccraft/kbforge.yaml"
+  BEFORE_QUEUE=$(cat "$RT/.speccraft/QUEUE.md")
+  TODAY="$(date -u +%Y-%m-%d)"
+  printf -- '- resolved 2000-01-01: kb/x cites y.py:1\n- resolved %s: kb/x cites z.py:2\n' "$TODAY" \
+    > "$RT/.speccraft/QUEUE-ARCHIVE.md"
   ( cd "$RT" && python3 "$KIT/../decay.py" --config .speccraft/kbforge.yaml ) >/dev/null 2>&1
+  AFTER_QUEUE=$(cat "$RT/.speccraft/QUEUE.md")
   grep -q 'divergence: keep me' "$RT/.speccraft/QUEUE.md" && ok || no "decay: adjudication item never archived"
-  grep -q 'archived .*1 mechanical item' "$RT/.speccraft/QUEUE.md" && ok || no "decay: digest line left in queue"
-  grep -q 're-verify' "$RT/.speccraft/QUEUE-ARCHIVE.md" && ok || no "decay: mechanical item moved to archive"
+  [ "$BEFORE_QUEUE" = "$AFTER_QUEUE" ] && ok || no "decay: decay.py never touches QUEUE.md"
+  grep -q '2000-01-01' "$RT/.speccraft/QUEUE-ARCHIVE.md" && no "decay: archive trims entries older than queue_archive_days" || ok
+  grep -q -- "- resolved $TODAY:" "$RT/.speccraft/QUEUE-ARCHIVE.md" && ok || no "decay: archive keeps recent entries"
   ( cd "$RT" && KBFORGE_HOME="$KIT/.." "$KIT/hooks/kb-briefing.sh" </dev/null | grep -q 'Trust: .* challenged (2 auto)' ) && ok || no "decay: briefing trust line counts auto-demotions"
   rm -rf "$RT"
 fi
@@ -354,6 +383,20 @@ if run_section behavioral; then
   assert_contains "$OUT" 'HITS: 0' "behavioral: clean diff trips none"
   bash -n "$HERE/behavioral/run.sh" && ok || no "behavioral: run.sh syntax"
   grep -q 'worktree remove' "$HERE/behavioral/run.sh" && ok || no "behavioral: worktrees cleaned up"
+fi
+
+# ---------- section: two-lane queue suite (SIGNALS.md / QUEUE.md / QUEUE-ARCHIVE.md) ----------
+if run_section queuesplit; then
+  echo "== two-lane queue suite =="
+  QOUT=$(bash "$HERE/test-queue-split.sh" 2>&1); QRC=$?
+  printf '%s\n' "$QOUT"
+  QP=$(printf '%s' "$QOUT" | grep -Eo '[0-9]+ passed' | tail -1 | grep -Eo '[0-9]+')
+  QF=$(printf '%s' "$QOUT" | grep -Eo '[0-9]+ failed' | tail -1 | grep -Eo '[0-9]+')
+  PASS=$((PASS + ${QP:-0})); FAIL=$((FAIL + ${QF:-0}))
+  if [ "$QRC" -ne 0 ] && [ "${QF:-0}" -eq 0 ]; then
+    # suite failed but gave no parseable failure count — still must fail self-test
+    no "queuesplit: test-queue-split.sh exited nonzero ($QRC)"
+  fi
 fi
 
 echo "self-test: $PASS passed, $FAIL failed"
