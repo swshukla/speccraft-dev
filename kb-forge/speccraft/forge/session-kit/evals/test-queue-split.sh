@@ -249,12 +249,13 @@ echo "$BOUT2" | grep -q '2 open divergences | 0 drift signals' \
 
 echo "== kb-audit numbers within ## Open, not file-wide =="
 QKB="$TMP/qkb"; mkdir -p "$QKB/kb/derived"
-printf '## Open\n1. existing divergence\n\n## Ruled\n- past ruling with 9. fake number\n' > "$QKB/QUEUE.md"
+printf '## Open\n1. existing divergence\n\n## Ruled — 2026-07-19\n\n9. a past ruling that a file-wide count WOULD catch\n' > "$QKB/QUEUE.md"
 printf 'source_commit: abc\n' > "$QKB/kb/derived/inventory.md"
 printf 'repo: %s\n' "$CODE" > "$QKB/kbforge.yaml"
 # simulate kb-audit appending one finding (call the script's append path or its helper)
-KB="$QKB" bash "$FORGE/session-kit/evals/kb-audit.sh" --append-test "audited: sample finding" 2>/dev/null || true
-# the new item must be numbered 2 (within ## Open), not 3 (file-wide count of 1.+9.)
+bash "$FORGE/session-kit/evals/kb-audit.sh" --kb "$QKB" --append-test "audited: sample finding" 2>/dev/null || true
+# the new item must be numbered 2 (within ## Open); old file-wide grep -cE '^[0-9]+\.'
+# would count 1. (Open) + 9. (Ruled) = 2 -> next = 3 (WRONG)
 grep -qE '^2\. .*sample finding' "$QKB/QUEUE.md" && ok "scoped numbering (2)" || bad "scoped numbering"
 awk '/^## Open/{o=1;next}/^## /{o=0}o&&/sample finding/{f=1}END{exit !f}' "$QKB/QUEUE.md" && ok "inserted inside ## Open" || bad "inserted inside ## Open"
 

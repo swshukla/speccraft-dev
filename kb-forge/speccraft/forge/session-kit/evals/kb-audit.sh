@@ -4,7 +4,7 @@
 # Usage: kb-audit.sh [--kb <.speccraft-dir>] [--root <repo-root>] [--judge]
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
-KB="${KB:-}"; ROOT="${ROOT:-}"; JUDGE=0; APPEND_TEST=""
+KB=""; ROOT=""; JUDGE=0; APPEND_TEST=""
 # insert "$1" as the next-numbered item at the end of QUEUE.md's ## Open
 # section (numbering scoped to that section, never a file-wide count, and
 # never appended past arbitrary end-of-file). Test-only entry point below
