@@ -26,13 +26,7 @@ It's built for the hard case — an **existing (brownfield) codebase** whose des
 
 </div>
 
-> **This repo is `speccraft-dev`** — the private development monorepo. The published package (`pip install speccraft-cli`) is built from [`kb-forge/`](kb-forge/) alone. Everything above the divider is how to *use* Speccraft; everything below it is how to *work on it*. See [Repository topology](#repository-topology-read-this-first).
-
----
-
 ## Contents
-
-**Using Speccraft**
 
 - [Why it exists](#why-it-exists)
 - [Getting started](#getting-started)
@@ -41,16 +35,8 @@ It's built for the hard case — an **existing (brownfield) codebase** whose des
 - [What it captures](#what-it-captures)
 - [The steady-state loop](#the-steady-state-loop)
 - [Enforcement](#enforcement)
-- [The KB layout](#the-kb-layout)
+- [Layout](#layout)
 - [Multi-tool](#multi-tool)
-
-**Developing Speccraft**
-
-- [Repository topology](#repository-topology-read-this-first)
-- [Repo layout](#repo-layout)
-- [Working in this repo](#working-in-this-repo)
-- [Releasing](#releasing)
-- [Roadmap](#roadmap)
 - [License](#license)
 
 ---
@@ -150,7 +136,7 @@ pipx install speccraft-cli
 cd the-repo && speccraft init .        # detects the existing KB, installs hooks only
 ```
 
-**Go deeper:** [`kb-forge/speccraft/forge/README.md`](kb-forge/speccraft/forge/README.md) (full walkthrough) · [`kb-forge/speccraft/forge/SPEC.md`](kb-forge/speccraft/forge/SPEC.md) (system reference) · [`kb-forge/speccraft/forge/workflow-execution.html`](kb-forge/speccraft/forge/workflow-execution.html) (visual tour)
+**Go deeper:** [`speccraft/forge/README.md`](kb-forge/speccraft/forge/README.md) (full walkthrough) · [`speccraft/forge/SPEC.md`](kb-forge/speccraft/forge/SPEC.md) (system reference) · [`speccraft/forge/workflow-execution.html`](kb-forge/speccraft/forge/workflow-execution.html) (visual tour)
 
 ---
 
@@ -251,7 +237,7 @@ Sessions write only `QUEUE.md`, `kb/decisions/`, `kb/inferred/`, and `proposed` 
 
 ---
 
-## The KB layout
+## Layout
 
 ```
 your-repo/.speccraft/
@@ -280,118 +266,6 @@ One source, three runtimes.
 | Git hooks | identical | identical | identical |
 
 The git hooks enforce identically regardless of which tool — or which human — makes the commit.
-
----
-
-# Developing Speccraft
-
-Everything from here down is about working on Speccraft itself — repo topology, the dev loop, and how a release reaches PyPI.
-
----
-
-## Repository topology (read this first)
-
-There are **two GitHub repos**, and they are related in a way that is easy to get wrong:
-
-| Repo | Remote | Role |
-|---|---|---|
-| **`speccraft-dev`** (this repo) | `origin` → `swshukla/speccraft-dev` (private) | The dev monorepo. Everything lives here: the package source, docs, roadmaps, specs, the publish tooling. |
-| **`speccraft`** (package target) | `speccraft` → `swshukla/speccraft` (public) | Package-only. This is what PyPI builds from (`speccraft-cli`). It contains **only** a snapshot of `kb-forge/`. |
-
-**The two repos share no git history.** Publishing is therefore *not* a `git push` between them — it's a **snapshot-on-top-of-tip + tag**: [`publish.sh`](publish.sh) copies the current `kb-forge/` tree onto the package repo's latest commit and pushes a `vX.Y.Z` tag, which triggers the PyPI workflow. See [Releasing](#releasing).
-
-```
- this repo (speccraft-dev)              package repo (speccraft)            PyPI
- ┌───────────────────────┐  publish.sh  ┌──────────────────────┐  tag CI  ┌──────────────┐
- │ kb-forge/  ───────────┼─ snapshot ──▶│ (kb-forge/ contents) │ ───────▶ │ speccraft-cli│
- │ docs/  roadmaps/ …    │  + tag vX.Y.Z│  = the pip package    │          │  X.Y.Z        │
- └───────────────────────┘              └──────────────────────┘          └──────────────┘
-```
-
----
-
-## Repo layout
-
-```
-speccraft-dev/
-├── kb-forge/            ← THE PACKAGE (published to PyPI as speccraft-cli)
-│   ├── README.md            product README (ships to PyPI)
-│   ├── pyproject.toml       package metadata + version (bumped by publish.sh)
-│   ├── speccraft/
-│   │   ├── cli.py           `speccraft` entrypoint (init, …)
-│   │   └── forge/           the engine — see below
-│   └── .github/workflows/   the PyPI publish workflow (runs on tag in the package repo)
-├── docs/
-│   ├── agentic-sdlc/        strategy / thesis docs
-│   ├── roadmaps/            forward plans (e.g. drift-prevention roadmap)
-│   └── superpowers/         specs, plans, reviews (brainstorm → plan → execute artifacts)
-├── site/                    marketing site
-├── publish.sh              snapshot kb-forge/ → package repo + tag (the release tool)
-└── whiteboard-notes.md      scratch
-```
-
-### Inside `kb-forge/speccraft/forge/`
-
-The engine. Pure-stdlib, no LLM calls in the tooling itself.
-
-| Area | Files |
-|---|---|
-| **Harvesters** (deterministic, no-LLM) | `seed0.py` (structure), `assume0.py` (assumption residue), `dup0.py` (duplication), `deps0.py` (dependencies + advisories) |
-| **Drift & hygiene** | `drift.py` (subtractive/additive/anchor drift → `SIGNALS.md`), `dep-diff.py`, `decay.py`, `signals.py` (the mechanical-lane projection), `migrate_split_queue.py` |
-| **Recall / grounding** | `recall.py` |
-| **Session kit** | `session-kit/skills/` (the `speccraft-*` procedures), `session-kit/hooks/` (git + SessionStart hooks), `session-kit/evals/` (the test suite) |
-| **Reference** | `README.md` (walkthrough), `SPEC.md` (system reference) |
-
-The `.speccraft/` KB layout that Speccraft *produces* in a target repo is documented above, under [The KB layout](#the-kb-layout).
-
----
-
-## Working in this repo
-
-**Requirements:** `python3` (3.9+), `git`. No API keys, no services — the harvesters and hooks are pure stdlib.
-
-**Run the test suite** (bash-based eval harness, the source of truth for the engine):
-
-```bash
-bash kb-forge/speccraft/forge/session-kit/evals/self-test.sh        # full suite
-bash kb-forge/speccraft/forge/session-kit/evals/test-queue-split.sh # focused: two-lane queue
-```
-
-`self-test.sh` builds hermetic fixture KBs, invokes the real CLIs, and asserts on file content. Green means the engine's behavior is intact — keep it green before publishing.
-
-**Dev workflow.** Feature work here follows the brainstorm → spec → plan → execute loop (the [superpowers](https://github.com/obra/superpowers) skills), with artifacts landing in `docs/superpowers/{specs,plans,reviews}/`. Larger arcs are tracked in `docs/roadmaps/`.
-
-**Try unreleased changes** without publishing:
-
-```bash
-pipx install git+https://github.com/swshukla/speccraft.git   # installs the package repo's main
-# or run the engine directly against a KB:
-python3 kb-forge/speccraft/forge/drift.py --config /path/to/.speccraft/kbforge.yaml --queue
-```
-
----
-
-## Releasing
-
-`publish.sh` is the only supported path to PyPI. It requires a clean tree, a `speccraft` remote, and a semver version.
-
-```bash
-./publish.sh 0.3.0 --dry-run    # validate: bumps nothing on the remotes, pushes/tags NOTHING
-./publish.sh 0.3.0              # real: bump kb-forge/pyproject.toml, commit to dev,
-                                #       snapshot kb-forge/ → speccraft/main, push tag v0.3.0
-                                #       (the tag triggers the PyPI publish workflow)
-./publish.sh 0.3.0 --yes        # same, skips the interactive confirm (for automation)
-```
-
-What it does, in order: bump the version in `kb-forge/pyproject.toml` → commit `chore(release): …` to this repo → snapshot `kb-forge/` onto the package repo's tip → push + tag `vX.Y.Z` (fires the PyPI workflow) → push the dev bump to `origin`. It refuses to republish an existing tag.
-
-**Always dry-run first**, and confirm the suite is green — a PyPI version is permanent.
-
----
-
-## Roadmap
-
-Active direction lives in [`docs/roadmaps/`](docs/roadmaps/). Current focus: the **drift-prevention roadmap** — a closed convergence loop (two-lane queue → forcing function → seam-aware recall → executable invariants). Phase 0 (the two-lane queue) shipped in `0.3.0`.
 
 ---
 
