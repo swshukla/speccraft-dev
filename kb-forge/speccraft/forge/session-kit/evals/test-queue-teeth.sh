@@ -127,5 +127,22 @@ unset KBFORGE_HOME
 printf '%s\n' "$OUT" | head -1 | grep -q 'HIGH' && ok "briefing first line is HIGH-debt banner" || bad "briefing first line is HIGH-debt banner"
 printf '%s\n' "$OUT" | grep -q 'BLOCKED' && ok "banner shows BLOCKED state" || bad "banner shows BLOCKED state"
 
+echo "== seed0 preserves ratified_through, inits if absent =="
+SK="$TMP/seed/.speccraft"; mkdir -p "$SK/kb/derived"
+( cd "$TMP/seed" && git init -q && git config user.email t@t && git config user.name t \
+  && mkdir -p src && printf 'a\n' > src/f.py && git add -A && git commit -qm c1 )
+printf 'repo: %s\n' "$TMP/seed" > "$SK/kbforge.yaml"
+# inventory with an EXISTING ratified_through that must survive re-seed
+printf 'source_commit: aaaaaaa\nratified_through: aaaaaaa\n' > "$SK/kb/derived/inventory.md"
+( cd "$TMP/seed" && printf 'b\n' >> src/f.py && git add -A && git commit -qm c2 )
+python3 "$FORGE/seed0.py" --config "$SK/kbforge.yaml" >/dev/null 2>&1 || true
+grep -q '^ratified_through: aaaaaaa' "$SK/kb/derived/inventory.md" && ok "seed0 preserves ratified_through" || bad "seed0 preserves ratified_through"
+grep -q '^source_commit:' "$SK/kb/derived/inventory.md" && ! grep -q '^source_commit: aaaaaaa' "$SK/kb/derived/inventory.md" && ok "seed0 advanced source_commit" || bad "seed0 advanced source_commit"
+# init case: no ratified_through present -> set to new source_commit
+printf 'source_commit: aaaaaaa\n' > "$SK/kb/derived/inventory.md"
+python3 "$FORGE/seed0.py" --config "$SK/kbforge.yaml" >/dev/null 2>&1 || true
+NEWSC=$(grep '^source_commit:' "$SK/kb/derived/inventory.md" | awk '{print $2}')
+grep -q "^ratified_through: $NEWSC" "$SK/kb/derived/inventory.md" && ok "seed0 inits ratified_through=source_commit" || bad "seed0 inits ratified_through"
+
 echo "queue-teeth: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
