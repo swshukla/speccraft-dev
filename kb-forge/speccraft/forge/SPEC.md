@@ -29,11 +29,19 @@ atomically in one commit, and one clone/push carries both. First deployment:
 ## KB layout (`<product>/.speccraft/`)
 
     kbforge.yaml          product profile: repo path, components, risk_paths
+
+- `high_debt_ceiling` (default 3) — max open HIGH findings before a pin advance is
+  refused. Set 0 for zero-tolerance.
+- `high_debt_max_age_days` (default 14) — any open HIGH finding older than this
+  (by its `Raised` date) refuses a pin advance.
+
     README.md             trust rules
     QUEUE.md              the one adjudication queue (doc 09); founder rulings
     ledger/DIV-*.md       ruled divergences (fix-code / fix-model / accepted-deviation)
     findings/FINDINGS.md  consolidated bug/work list — proposed→confirmed→fixed
                           (agents append `proposed`; only KB_RATIFY sets confirmed)
+                          `Raised` column (ISO date, stamped on append, never changed);
+                          open HIGH findings gate pin advance (see `gate.py`)
     kb/derived/           machine-harvested, provenance=derived, regenerated
                           wholesale on re-pin — never hand-edited
     kb/normative/         elicited intent & invariants (founder interviews)
