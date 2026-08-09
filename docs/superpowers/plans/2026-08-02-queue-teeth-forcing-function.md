@@ -749,3 +749,292 @@ git commit -m "test(speccraft): wire HIGH-debt suite into self-test; document co
 ## Execution Handoff
 
 Plan complete. One deferred lookup (both flagged inline): the forge-path and KB-dir variable names inside `session-kit/pre-commit` and `kb-briefing.sh` — the implementer reads the actual variable each hook already uses (they invoke `recall.py`/reference `$KB` today) and matches it. Everything else is literal.
+
+---
+
+# REVISION (2026-08-09) — Split the anchor (`ratified_through`)
+
+**Why:** the final whole-branch review found gating `source_commit` is defeated by the ship
+loop (it re-pins every commit via `KB_SHIPLOOP`, bypassing `pre-commit` before the gate). See
+the revised spec §0. Fix-forward on branch `worktree-queue-teeth` (current tip `7c1bbec`):
+Tasks 1–2 (gate.py debt-compute, `Raised` migration) stand; the tasks below re-point the gate
+from the mechanical pin to a new **trust boundary** and fold in the I1/I2/M1 escape-hatch fixes.
+
+**Revised Global Constraints (additions):**
+- Two anchors in `kb/derived/inventory.md`: `source_commit:` (mechanical, ship-loop, ungated)
+  and `ratified_through:` (trust boundary, advanced only by gated `ratify`; init = `source_commit`).
+- The gate guards advancing **`ratified_through`**, never `source_commit`.
+- Waiver line format changes anchor name: `- <date>  ratified_through <old>-><new>  deferred: BUG-…  — reason: "…"`.
+- All fixes preserve the bash test harness; each R-task updates `test-queue-teeth.sh` and ends green.
+
+## Task R1: `seed0.py` — preserve `ratified_through` (+ init)
+
+**Files:** Modify `seed0.py`; Test `session-kit/evals/test-queue-teeth.sh`.
+
+**Context:** `seed0.py` rewrites derived-KB frontmatter (incl. `inventory.md`'s `source_commit:`)
+on every ship-loop run. It must NOT clobber `ratified_through`. OPEN `seed0.py`, find where it
+writes the `source_commit:` frontmatter (the `header()`/inventory writer, ~lines 56-62), and:
+1. Before rewriting, READ the existing `ratified_through:` value from the current `inventory.md`
+   (if present).
+2. When writing the derived frontmatter, emit `ratified_through:` too — **preserving** the read
+   value unchanged. If it was absent (legacy/first seed), initialize it to the NEW `source_commit`.
+3. Only `inventory.md` needs the `ratified_through` field (it's the pin file); other derived files
+   are unaffected.
+
+- [ ] **Step 1: Failing test** (append to `test-queue-teeth.sh`, before the summary echo)
+
+```bash
+echo "== seed0 preserves ratified_through, inits if absent =="
+SK="$TMP/seed/.speccraft"; mkdir -p "$SK/kb/derived"
+( cd "$TMP/seed" && git init -q && git config user.email t@t && git config user.name t \
+  && mkdir -p src && printf 'a\n' > src/f.py && git add -A && git commit -qm c1 )
+printf 'repo: %s\n' "$TMP/seed" > "$SK/kbforge.yaml"
+# inventory with an EXISTING ratified_through that must survive re-seed
+printf 'source_commit: aaaaaaa\nratified_through: aaaaaaa\n' > "$SK/kb/derived/inventory.md"
+( cd "$TMP/seed" && printf 'b\n' >> src/f.py && git add -A && git commit -qm c2 )
+python3 "$FORGE/seed0.py" --config "$SK/kbforge.yaml" >/dev/null 2>&1 || true
+grep -q '^ratified_through: aaaaaaa' "$SK/kb/derived/inventory.md" && ok "seed0 preserves ratified_through" || bad "seed0 preserves ratified_through"
+grep -q '^source_commit:' "$SK/kb/derived/inventory.md" && ! grep -q '^source_commit: aaaaaaa' "$SK/kb/derived/inventory.md" && ok "seed0 advanced source_commit" || bad "seed0 advanced source_commit"
+# init case: no ratified_through present -> set to new source_commit
+printf 'source_commit: aaaaaaa\n' > "$SK/kb/derived/inventory.md"
+python3 "$FORGE/seed0.py" --config "$SK/kbforge.yaml" >/dev/null 2>&1 || true
+NEWSC=$(grep '^source_commit:' "$SK/kb/derived/inventory.md" | awk '{print $2}')
+grep -q "^ratified_through: $NEWSC" "$SK/kb/derived/inventory.md" && ok "seed0 inits ratified_through=source_commit" || bad "seed0 inits ratified_through"
+```
+
+- [ ] **Step 2:** run → FAIL (seed0 doesn't write `ratified_through`).
+- [ ] **Step 3:** make the seed0 edit per Context above (read the file; adapt to its real writer).
+- [ ] **Step 4:** run → PASS.
+- [ ] **Step 5:** commit `feat(speccraft): seed0 preserves ratified_through trust boundary`.
+
+## Task R2: `gate.py` — two anchors, status banner, waive→`ratified_through`, I1/I2/M1
+
+**Files:** Modify `gate.py`; Test `test-queue-teeth.sh`.
+
+**Interfaces:** `verdict()` debt fields unchanged. Add anchor reads + status. `--banner` = two-anchor
+KB status. `--waive` targets `ratified_through`, `makedirs` ledger, `git add`s the waiver. `--check`
+fails **closed** on a corrupt FINDINGS.md.
+
+Apply these concrete edits to the existing `gate.py`:
+
+(a) Add an anchor reader and a status computer:
+```python
+def _inv(kbroot):
+    """Return (source_commit, ratified_through) from inventory.md ('' if absent)."""
+    path = os.path.join(kbroot, INVENTORY)
+    src = rat = ""
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith("source_commit:"):
+                    src = line.split(":", 1)[1].strip()
+                elif line.startswith("ratified_through:"):
+                    rat = line.split(":", 1)[1].strip()
+    return src, rat
+
+
+def _unreviewed(repo, ratified, source):
+    if not ratified or not source or ratified == source:
+        return 0
+    try:
+        out = subprocess.run(["git", "-C", repo, "rev-list", "--count",
+                              f"{ratified}..{source}"], capture_output=True,
+                             text=True, check=True).stdout.strip()
+        return int(out or "0")
+    except Exception:
+        return 0
+```
+
+(b) Make `open_high` fail **closed** on a corrupt FINDINGS.md (M1) — if the file exists but no
+table header is found, signal corruption:
+```python
+def open_high(kbroot):
+    path = os.path.join(kbroot, FINDINGS)
+    if not os.path.exists(path):
+        return []                      # no findings file = no debt (safe)
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    rows = list(_table_rows(text))
+    if "| ID " in text and not any("sev" in r for r in rows):
+        raise ValueError("FINDINGS.md table unparseable")   # fail closed
+    return [r for r in rows
+            if r.get("sev", "").lower() == "high"
+            and r.get("status", "").lower() in ("proposed", "confirmed")]
+```
+and in `verdict()`, wrap the `open_high` call so corruption → blocked:
+```python
+def verdict(kbroot, ceiling, max_age):
+    try:
+        highs = open_high(kbroot)
+    except ValueError as e:
+        return {"blocked": True, "count": -1, "oldest": None, "ids": [],
+                "reasons": [f"FINDINGS.md unparseable ({e}) — failing closed"]}
+    # ... rest unchanged ...
+```
+
+(c) `--banner` — two-anchor status. Replace `banner(v)` with a version taking the anchors:
+```python
+def banner(v, unreviewed):
+    debt = v["count"] if v["count"] >= 0 else "?"
+    if unreviewed == 0 and not v["blocked"] and v["count"] == 0:
+        return "✓ KB caught up — 0 open HIGH findings"
+    parts = []
+    if unreviewed:
+        parts.append(f"{unreviewed} commit(s) unreviewed")
+    if v["count"]:
+        o = v["oldest"]
+        parts.append(f"{debt} open HIGH" + (f" (oldest {o[1]}, {o[0]}d)" if o else ""))
+    tail = " — ratify BLOCKED" if v["blocked"] else " — ratify to catch up"
+    icon = "⛔" if v["blocked"] else "⚠"
+    return f"{icon} KB behind: " + " · ".join(parts) + tail
+```
+
+(d) `--waive` — target `ratified_through`, makedirs (I1), git add (I2):
+```python
+def waive(kbroot, reason, repo):
+    _src, new = _inv(kbroot)                       # advancing ratified_through
+    old = "unknown"
+    try:
+        prev = subprocess.run(["git", "-C", repo, "show",
+                               "HEAD:.speccraft/kb/derived/inventory.md"],
+                              capture_output=True, text=True, check=True).stdout
+        for line in prev.splitlines():
+            if line.startswith("ratified_through:"):
+                old = line.split(":", 1)[1].strip()
+    except Exception:
+        pass
+    try:
+        ids = ", ".join(r.get("id", "?") for r in open_high(kbroot)) or "(none)"
+    except ValueError:
+        ids = "(unparseable)"
+    line = f'- {date.today().isoformat()}  ratified_through {old}->{new}  deferred: {ids}  — reason: "{reason}"\n'
+    wpath = os.path.join(kbroot, WAIVERS)
+    os.makedirs(os.path.dirname(wpath), exist_ok=True)          # I1
+    new_file = not os.path.exists(wpath)
+    with open(wpath, "a", encoding="utf-8") as fh:
+        if new_file:
+            fh.write("# Debt waivers — append-only. Each line authorizes one "
+                     "ratified_through advance past open HIGH debt.\n\n")
+        fh.write(line)
+    try:
+        subprocess.run(["git", "-C", repo, "add", "--",
+                        ".speccraft/ledger/DEBT-WAIVERS.md"], check=False)  # I2
+    except Exception:
+        pass
+    return new
+```
+
+(e) `main()` — wire the anchor read + new banner signature:
+```python
+    src, rat = _inv(kbroot)
+    repo = os.path.expanduser(cfg.get("repo", "."))
+    if args.waive is not None:
+        new = waive(kbroot, args.waive, repo)
+        print(f"waived: ratified_through {new} — open HIGH debt logged to ledger/DEBT-WAIVERS.md")
+        return 0
+    v = verdict(kbroot, ceiling, max_age)
+    if args.banner:
+        print(banner(v, _unreviewed(repo, rat, src)))
+        return 0
+    # --check unchanged (exit 1 if v["blocked"])
+```
+
+- [ ] **Step 1: Update tests** — existing gate.py assertions in `test-queue-teeth.sh` that grep the
+  banner for `BLOCKED`/`0 open HIGH` still hold, but add: a fixture with `ratified_through != source_commit`
+  → banner shows `unreviewed`; a corrupt FINDINGS.md (`| ID ...` header, junk body) → `--check` exits 1
+  (fail closed); the `--waive` assertion updates to grep `ratified_through .*->` (not `pin`), and asserts
+  `DEBT-WAIVERS.md` is `git`-staged after `--waive` in a git-repo fixture.
+- [ ] **Step 2–4:** run (fails on new assertions), apply edits (a)–(e), run → PASS.
+- [ ] **Step 5:** commit `feat(speccraft): gate.py two-anchor status; waive targets ratified_through; I1/I2/M1`.
+
+## Task R3: `session-kit/pre-commit` — gate `ratified_through` (not `source_commit`)
+
+**Files:** Modify `session-kit/pre-commit`; Test `test-queue-teeth.sh`.
+
+Change the gate trigger inside the `KB_RATIFY` branch from `source_commit` to `ratified_through`:
+```sh
+  if git diff --cached -- "$KB/kb/derived/inventory.md" | grep -q '^+ratified_through:'; then
+    NEWRT=$(git diff --cached -- "$KB/kb/derived/inventory.md" \
+            | sed -nE 's/^\+ratified_through:[[:space:]]*([^[:space:]]+).*/\1/p' | head -1)
+    if ! python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" >/dev/null 2>&1; then
+      if git diff --cached -- "$KB/ledger/DEBT-WAIVERS.md" | grep -qE "^\+.*->[[:space:]]*${NEWRT}([[:space:]]|\$)"; then
+        :   # staged waiver names this ratified_through — authorized
+      else
+        echo "pre-commit: HIGH-debt gate blocks advancing ratified_through to ${NEWRT}." >&2
+        python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" >&2 || true
+        echo "  Fix the HIGH findings, or: python3 $FORGE/gate.py --config $KB/kbforge.yaml --waive \"reason\"" >&2
+        exit 1
+      fi
+    fi
+  fi
+```
+
+- [ ] **Step 1: Tests** — update the existing pre-commit test: (a) the blocked/waiver flow now advances
+  `ratified_through` (not `source_commit`) under `KB_RATIFY=1` — blocked without waiver, allowed with;
+  (b) NEW: a `KB_SHIPLOOP=1` commit that advances **`source_commit`** under HIGH debt SUCCEEDS (mechanical
+  pin never gated). Seed with `KB_SHIPLOOP=1` as before.
+- [ ] **Step 2–4:** run (fails), edit, run → PASS.
+- [ ] **Step 5:** commit `feat(speccraft): pre-commit gates ratified_through, not the mechanical pin`.
+
+## Task R4: `kb-briefing.sh` — two-anchor status banner
+
+**Files:** Modify `kb-briefing.sh`; Test `test-queue-teeth.sh`.
+
+The banner already calls `python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" --banner` — after R2 that
+emits the two-anchor status. Verify the call is unchanged and correct; if the briefing computed anything
+banner-related itself, remove that (gate.py owns the status now). No logic beyond the existing guarded call
+should be needed.
+
+- [ ] **Step 1: Tests** — update the briefing test: green state (`ratified_through==source_commit`, no HIGH)
+  → first line `KB caught up`; behind state (unreviewed gap and/or HIGH debt) → first line `KB behind`.
+- [ ] **Step 2–4:** run, adjust the guarded call if needed, run → PASS.
+- [ ] **Step 5:** commit `feat(speccraft): kb-briefing shows two-anchor KB status`.
+
+## Task R5: `speccraft-ratify/SKILL.md` — advance `ratified_through`
+
+**Files:** Modify `speccraft-ratify/SKILL.md` (prose only).
+
+Replace the "advance `source_commit`" instruction (added in the first pass) with advancing
+`ratified_through`:
+```markdown
+After adjudicating the findings, advance the trust boundary: set `ratified_through:` in
+`kb/derived/inventory.md` to the current `source_commit:` value ("the KB is reviewed and
+clean through here"). Do NOT touch `source_commit` — the ship loop owns it.
+
+Before advancing, run the HIGH-debt gate:
+
+    python3 <forge>/gate.py --config <kbroot>/kbforge.yaml
+
+If it exits 0, advance `ratified_through` and commit (`KB_RATIFY=1`). If it BLOCKS, either fix
+the HIGH findings first, or record a waiver (which git-adds itself and authorizes this one advance):
+
+    python3 <forge>/gate.py --config <kbroot>/kbforge.yaml --waive "why you're deferring"
+
+The pre-commit hook enforces this: advancing `ratified_through` under HIGH debt without a
+matching waiver is refused.
+```
+(Leave the `Raised`-preserve instruction from the first pass intact. `diverge`'s `Raised` stamp is unchanged.)
+
+- [ ] **Step 1:** make the prose edit; verify `grep -q ratified_through` on the ratify SKILL.
+- [ ] **Step 2:** commit `docs(speccraft): ratify advances ratified_through trust boundary`.
+
+## Task R6: full-suite green + SPEC.md anchor note
+
+**Files:** `session-kit/evals/self-test.sh` (verify), `SPEC.md` (document the two anchors).
+
+- [ ] **Step 1:** run `bash kb-forge/speccraft/forge/session-kit/evals/self-test.sh` — must be all-green,
+  including the revised queue-teeth suite. Report the final `self-test: N passed, 0 failed` line.
+- [ ] **Step 2:** in `SPEC.md`, where `inventory.md`/the pin is described, document both anchors:
+  `source_commit` (mechanical, ship-loop) and `ratified_through` (trust boundary, advanced by gated ratify).
+- [ ] **Step 3:** commit `test(speccraft): full suite green post-split; document two anchors`.
+
+## Revision self-review
+- Spec §4.1 two anchors → R1 (seed0 write/preserve) + R2 (gate reads) + SKILL init note ✓
+- §4.3 gate compute (unchanged) + M1 fail-closed → R2 ✓
+- §4.4 enforcement re-point (ratify prose + pre-commit) → R5 + R3 ✓
+- §4.5 two-anchor status banner → R2 (`banner`) + R4 (briefing) ✓
+- §4.6 waiver→ratified_through + I1 makedirs + I2 git-add → R2 ✓
+- §5 tests (ratified gate, ship-loop-not-gated, seed0-preserve, status, fail-closed, tracked waiver) → R1–R4 ✓
+- Deferred (safe): T1(b) waiver git-show success-path assertion, T3 blocks-vs-broken — carry as minors.
+Placeholder scan: R1/R3/R4 flag "adapt to the file's real writer/vars" (seed0 writer, hook vars) — a read,
+not a vague-in-code placeholder. gate.py edits (a)–(e) are literal.
