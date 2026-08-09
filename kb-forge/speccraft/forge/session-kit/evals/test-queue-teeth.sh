@@ -63,5 +63,23 @@ python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" --waive "shipping launch" >
 grep -qE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}  pin .*->def5678  deferred: BUG-001  — reason: "shipping launch"' "$KB/ledger/DEBT-WAIVERS.md" \
   && ok "waiver line well-formed" || bad "waiver line well-formed"
 
+echo "== migrate: backfills Raised from git history, idempotent =="
+MKB="$TMP/mig/.speccraft"; mkdir -p "$MKB/findings" "$MKB/kb/derived"
+( cd "$TMP/mig" && git init -q && git config user.email t@t && git config user.name t )
+printf 'source_commit: HEAD\n' > "$MKB/kb/derived/inventory.md"
+printf 'repo: %s\n' "$TMP/mig" > "$MKB/kbforge.yaml"
+# legacy FINDINGS.md with NO Raised column
+{ echo '| ID | Sev | Finding | Evidence (@pin) | Source | Status |';
+  echo '|----|-----|---------|-----------------|--------|--------|';
+  echo '| BUG-001 | High | legacy row | ev | src | proposed |'; } > "$MKB/findings/FINDINGS.md"
+( cd "$TMP/mig" && git add -A && GIT_AUTHOR_DATE='2026-07-01T00:00:00' GIT_COMMITTER_DATE='2026-07-01T00:00:00' git commit -qm "add finding BUG-001" )
+python3 "$FORGE/migrate_findings_raised.py" --config "$MKB/kbforge.yaml"
+head -1 "$MKB/findings/FINDINGS.md" | grep -q 'Raised' && ok "header gains Raised column" || bad "header gains Raised column"
+grep -qE '\| BUG-001 \| High \| 2026-07-01 \|' "$MKB/findings/FINDINGS.md" && ok "row stamped from git history" || bad "row stamped from git history"
+# idempotent: second run doesn't double-add
+BEFORE="$(cat "$MKB/findings/FINDINGS.md")"
+python3 "$FORGE/migrate_findings_raised.py" --config "$MKB/kbforge.yaml"
+[ "$BEFORE" = "$(cat "$MKB/findings/FINDINGS.md")" ] && ok "migration idempotent" || bad "migration idempotent"
+
 echo "queue-teeth: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
