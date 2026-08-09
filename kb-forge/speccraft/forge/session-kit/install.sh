@@ -34,7 +34,8 @@ fi
 #    .claude/skills (Claude Code) + .agents/skills (Codex & OpenCode both
 #    read the Agent Skills standard natively) + .opencode/commands (explicit
 #    /speccraft-* invocation in OpenCode).
-for s in speccraft-interview speccraft-recall speccraft-decide speccraft-diverge speccraft-ratify speccraft-eval; do
+for d in "$KIT/skills/"speccraft-*; do
+  s=$(basename "$d")
   mkdir -p "$REPO/.claude/skills/$s" "$REPO/.agents/skills/$s"
   cp "$KIT/skills/$s/SKILL.md" "$REPO/.claude/skills/$s/SKILL.md"
   cp "$KIT/skills/$s/SKILL.md" "$REPO/.agents/skills/$s/SKILL.md"
@@ -99,7 +100,10 @@ for h in post-commit pre-commit; do
 done
 
 # 6. First status file
-"$KIT/hooks/kb-status.sh" 2>/dev/null || (cd "$REPO" && "$KIT/hooks/kb-status.sh") || true
+# must run INSIDE the target repo: kb-status.sh resolves its root from the
+# cwd's git toplevel, and exits 0 (silently) when that repo has no KB — so a
+# bare call from elsewhere "succeeds" without writing anything.
+(cd "$REPO" && "$KIT/hooks/kb-status.sh") || true
 echo "KB-STATUS.md: generated"
 
 echo "Done. New agent sessions in $REPO see the KB; commits run the ship loop."
