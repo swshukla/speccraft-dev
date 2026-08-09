@@ -81,5 +81,35 @@ BEFORE="$(cat "$MKB/findings/FINDINGS.md")"
 python3 "$FORGE/migrate_findings_raised.py" --config "$MKB/kbforge.yaml"
 [ "$BEFORE" = "$(cat "$MKB/findings/FINDINGS.md")" ] && ok "migration idempotent" || bad "migration idempotent"
 
+echo "== pre-commit: blocks pin advance under debt, waiver unblocks =="
+G="$TMP/repo"; SP="$G/.speccraft"
+mkdir -p "$SP/findings" "$SP/kb/derived" "$SP/ledger"
+( cd "$G" && git init -q && git config user.email t@t && git config user.name t )
+printf 'repo: %s\nhigh_debt_ceiling: 0\nhigh_debt_max_age_days: 14\n' "$G" > "$SP/kbforge.yaml"
+printf 'source_commit: aaaaaaa\n' > "$SP/kb/derived/inventory.md"
+{ echo '| ID | Sev | Raised | Finding | Evidence (@pin) | Source | Status |';
+  echo '|----|-----|--------|---------|-----------------|--------|--------|';
+  echo "| BUG-001 | High | $(date +%F) | x | ev | src | proposed |"; } > "$SP/findings/FINDINGS.md"
+cp "$FORGE/session-kit/pre-commit" "$G/.git/hooks/pre-commit"; chmod +x "$G/.git/hooks/pre-commit"
+export KBFORGE_HOME="$FORGE"
+# seed commit via ship-loop bypass — establishes initial pinned state without
+# tripping the debt gate (FINDINGS.md already has an open HIGH over ceiling 0)
+( cd "$G" && git add -A && KB_SHIPLOOP=1 git commit -qm "seed" )
+# advance the pin -> should be BLOCKED (1 open HIGH > ceiling 0)
+printf 'source_commit: bbbbbbb\n' > "$SP/kb/derived/inventory.md"
+if ( cd "$G" && git add -A && KB_RATIFY=1 git commit -qm "advance pin" ) 2>/dev/null; then
+  bad "pre-commit blocks pin advance under debt"
+else
+  ok "pre-commit blocks pin advance under debt"
+fi
+# now waive and retry -> allowed
+python3 "$FORGE/gate.py" --config "$SP/kbforge.yaml" --waive "test waiver" >/dev/null
+if ( cd "$G" && git add -A && KB_RATIFY=1 git commit -qm "advance pin (waived)" ) 2>/dev/null; then
+  ok "waiver unblocks pin advance"
+else
+  bad "waiver unblocks pin advance"
+fi
+unset KBFORGE_HOME
+
 echo "queue-teeth: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
