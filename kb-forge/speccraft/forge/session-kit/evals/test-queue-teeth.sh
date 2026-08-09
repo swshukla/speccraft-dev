@@ -111,5 +111,21 @@ else
 fi
 unset KBFORGE_HOME
 
+echo "== briefing: leads with HIGH-debt banner =="
+BKB="$TMP/brief"; mkdir -p "$BKB/.speccraft/findings" "$BKB/.speccraft/kb/derived"
+( cd "$BKB" && git init -q && git config user.email t@t && git config user.name t )
+SP="$BKB/.speccraft"
+printf 'repo: %s\nhigh_debt_ceiling: 0\nhigh_debt_max_age_days: 14\n' "$BKB" > "$SP/kbforge.yaml"
+printf 'source_commit: %s\n' "$(cd "$BKB" && printf init > f && git add -A && git commit -qm i && git rev-parse --short HEAD)" > "$SP/kb/derived/inventory.md"
+mkdir -p "$SP/kb/normative"; printf '# INV\n' > "$SP/kb/normative/01-invariants.md"
+{ echo '| ID | Sev | Raised | Finding | Evidence (@pin) | Source | Status |';
+  echo '|----|-----|--------|---------|-----------------|--------|--------|';
+  echo "| BUG-001 | High | $(date +%F) | x | ev | src | proposed |"; } > "$SP/findings/FINDINGS.md"
+export KBFORGE_HOME="$FORGE"
+OUT="$(cd "$BKB" && bash "$FORGE/session-kit/hooks/kb-briefing.sh" 2>/dev/null)"
+unset KBFORGE_HOME
+printf '%s\n' "$OUT" | head -1 | grep -q 'HIGH' && ok "briefing first line is HIGH-debt banner" || bad "briefing first line is HIGH-debt banner"
+printf '%s\n' "$OUT" | grep -q 'BLOCKED' && ok "banner shows BLOCKED state" || bad "banner shows BLOCKED state"
+
 echo "queue-teeth: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

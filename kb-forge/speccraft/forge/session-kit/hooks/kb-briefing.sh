@@ -40,6 +40,10 @@ if [ "${PEND:-0}" -gt 0 ]; then
 fi
 TRUST="Trust: ${RAT:-0} ratified | ${PEND:-0} pending${PAGE} | ${CHAL:-0} challenged (${AUTO:-0} auto)"
 
+if [ -f "$KB/kbforge.yaml" ] && [ -f "$FORGE/gate.py" ]; then
+  python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" --banner 2>/dev/null || true
+fi
+
 echo "=== KB BRIEFING (trust-graded product truth: .speccraft/) ==="
 echo "KB pin: $PIN | last code commit: $LASTCODE ($SYNC)"
 echo "Open adjudication items: ${DIV} open divergences | ${SIG} drift signals (.speccraft/QUEUE.md, .speccraft/SIGNALS.md)"
