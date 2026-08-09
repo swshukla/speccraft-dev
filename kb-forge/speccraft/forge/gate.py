@@ -37,10 +37,13 @@ def _table_rows(text):
 def open_high(kbroot):
     path = os.path.join(kbroot, FINDINGS)
     if not os.path.exists(path):
-        return []
+        return []                      # no findings file = no debt (safe)
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
-    return [r for r in _table_rows(text)
+    rows = list(_table_rows(text))
+    if "| ID " in text and not any("sev" in r for r in rows):
+        raise ValueError("FINDINGS.md table unparseable")   # fail closed
+    return [r for r in rows
             if r.get("sev", "").lower() == "high"
             and r.get("status", "").lower() in ("proposed", "confirmed")]
 
@@ -53,7 +56,11 @@ def _age_days(raised):
 
 
 def verdict(kbroot, ceiling, max_age):
-    highs = open_high(kbroot)
+    try:
+        highs = open_high(kbroot)
+    except ValueError as e:
+        return {"blocked": True, "count": -1, "oldest": None, "ids": [],
+                "reasons": [f"FINDINGS.md unparseable ({e}) — failing closed"]}
     count = len(highs)
     dated = [(_age_days(r.get("raised", "")), r.get("id", "?")) for r in highs]
     dated = [(a, i) for a, i in dated if a is not None]
@@ -67,48 +74,77 @@ def verdict(kbroot, ceiling, max_age):
             "ids": [r.get("id", "?") for r in highs], "reasons": reasons}
 
 
-def banner(v):
-    if v["count"] == 0:
-        return "✓ 0 open HIGH findings"
-    o = v["oldest"]
-    agestr = f", oldest {o[1]}, {o[0]}d" if o else ""
-    if v["blocked"]:
-        return (f"⛔ {v['count']} open HIGH findings{agestr} — pin advance "
-                f"BLOCKED ({'; '.join(v['reasons'])})")
-    return f"✓ {v['count']} open HIGH finding(s){agestr} — within ceiling"
+def banner(v, unreviewed):
+    debt = v["count"] if v["count"] >= 0 else "?"
+    if unreviewed == 0 and not v["blocked"] and v["count"] == 0:
+        return "✓ KB caught up — 0 open HIGH findings"
+    parts = []
+    if unreviewed:
+        parts.append(f"{unreviewed} commit(s) unreviewed")
+    if v["count"]:
+        o = v["oldest"]
+        parts.append(f"{debt} open HIGH" + (f" (oldest {o[1]}, {o[0]}d)" if o else ""))
+    tail = " — ratify BLOCKED" if v["blocked"] else " — ratify to catch up"
+    icon = "⛔" if v["blocked"] else "⚠"
+    return f"{icon} KB behind: " + " · ".join(parts) + tail
 
 
-def _source_commit(path):
-    if not os.path.exists(path):
-        return ""
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            if line.startswith("source_commit:"):
-                return line.split(":", 1)[1].strip()
-    return ""
+def _inv(kbroot):
+    """Return (source_commit, ratified_through) from inventory.md ('' if absent)."""
+    path = os.path.join(kbroot, INVENTORY)
+    src = rat = ""
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith("source_commit:"):
+                    src = line.split(":", 1)[1].strip()
+                elif line.startswith("ratified_through:"):
+                    rat = line.split(":", 1)[1].strip()
+    return src, rat
+
+
+def _unreviewed(repo, ratified, source):
+    if not ratified or not source or ratified == source:
+        return 0
+    try:
+        out = subprocess.run(["git", "-C", repo, "rev-list", "--count",
+                              f"{ratified}..{source}"], capture_output=True,
+                             text=True, check=True).stdout.strip()
+        return int(out or "0")
+    except Exception:
+        return 0
 
 
 def waive(kbroot, reason, repo):
-    new = _source_commit(os.path.join(kbroot, INVENTORY))
+    _src, new = _inv(kbroot)                       # advancing ratified_through
     old = "unknown"
     try:
-        prev = subprocess.run(
-            ["git", "-C", repo, "show", "HEAD:.speccraft/kb/derived/inventory.md"],
-            capture_output=True, text=True, check=True).stdout
+        prev = subprocess.run(["git", "-C", repo, "show",
+                               "HEAD:.speccraft/kb/derived/inventory.md"],
+                              capture_output=True, text=True, check=True).stdout
         for line in prev.splitlines():
-            if line.startswith("source_commit:"):
+            if line.startswith("ratified_through:"):
                 old = line.split(":", 1)[1].strip()
     except Exception:
         pass
-    ids = ", ".join(r.get("id", "?") for r in open_high(kbroot)) or "(none)"
-    line = f'- {date.today().isoformat()}  pin {old}->{new}  deferred: {ids}  — reason: "{reason}"\n'
+    try:
+        ids = ", ".join(r.get("id", "?") for r in open_high(kbroot)) or "(none)"
+    except ValueError:
+        ids = "(unparseable)"
+    line = f'- {date.today().isoformat()}  ratified_through {old}->{new}  deferred: {ids}  — reason: "{reason}"\n'
     wpath = os.path.join(kbroot, WAIVERS)
+    os.makedirs(os.path.dirname(wpath), exist_ok=True)          # I1
     new_file = not os.path.exists(wpath)
     with open(wpath, "a", encoding="utf-8") as fh:
         if new_file:
             fh.write("# Debt waivers — append-only. Each line authorizes one "
-                     "pin advance past open HIGH debt.\n\n")
+                     "ratified_through advance past open HIGH debt.\n\n")
         fh.write(line)
+    try:
+        subprocess.run(["git", "-C", repo, "add", "--",
+                        ".speccraft/ledger/DEBT-WAIVERS.md"], check=False)  # I2
+    except Exception:
+        pass
     return new
 
 
@@ -125,14 +161,16 @@ def main():
     ceiling = int(cfg.get("high_debt_ceiling", "3") or "3")
     max_age = int(cfg.get("high_debt_max_age_days", "14") or "14")
 
+    src, rat = _inv(kbroot)
+    repo = os.path.expanduser(cfg.get("repo", "."))
     if args.waive is not None:
-        new = waive(kbroot, args.waive, os.path.expanduser(cfg.get("repo", ".")))
-        print(f"waived: pin {new} — open HIGH debt logged to ledger/DEBT-WAIVERS.md")
+        new = waive(kbroot, args.waive, repo)
+        print(f"waived: ratified_through {new} — open HIGH debt logged to ledger/DEBT-WAIVERS.md")
         return 0
 
     v = verdict(kbroot, ceiling, max_age)
     if args.banner:
-        print(banner(v))
+        print(banner(v, _unreviewed(repo, rat, src)))
         return 0
     if v["blocked"]:
         sys.stderr.write("HIGH-debt gate BLOCKED pin advance:\n")

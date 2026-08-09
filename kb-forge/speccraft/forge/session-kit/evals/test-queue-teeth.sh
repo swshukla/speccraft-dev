@@ -53,15 +53,49 @@ addrow "$KB" BUG-001 High "$OLD" proposed
 addrow "$KB" BUG-002 High "$TODAY" proposed
 python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" --banner | grep -q 'BLOCKED' && ok "banner shows BLOCKED" || bad "banner shows BLOCKED"
 KB="$TMP/ban2"; mkkb "$KB" 3 14
+addrow "$KB" BUG-000 High "$OLD" fixed
 python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" --banner | grep -q '0 open HIGH' && ok "banner shows none" || bad "banner shows none"
 
-echo "== waive appends a well-formed line =="
-KB="$TMP/wv"; mkkb "$KB" 0 14
-addrow "$KB" BUG-001 High "$OLD" proposed
-printf 'source_commit: def5678\n' > "$KB/kb/derived/inventory.md"
-python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" --waive "shipping launch" >/dev/null
-grep -qE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}  pin .*->def5678  deferred: BUG-001  — reason: "shipping launch"' "$KB/ledger/DEBT-WAIVERS.md" \
+echo "== banner: unreviewed commits between ratified_through and source_commit =="
+G="$TMP/unrev"; SP="$G/.speccraft"; mkdir -p "$SP/findings" "$SP/kb/derived"
+( cd "$G" && git init -q && git config user.email t@t && git config user.name t \
+  && printf a > f && git add -A && git commit -qm c1 )
+RAT="$(cd "$G" && git rev-parse --short HEAD)"
+( cd "$G" && printf b >> f && git add -A && git commit -qm c2 )
+SRC="$(cd "$G" && git rev-parse --short HEAD)"
+printf 'repo: %s\nhigh_debt_ceiling: 3\nhigh_debt_max_age_days: 14\n' "$G" > "$SP/kbforge.yaml"
+printf 'source_commit: %s\nratified_through: %s\n' "$SRC" "$RAT" > "$SP/kb/derived/inventory.md"
+{ echo '| ID | Sev | Raised | Finding | Evidence (@pin) | Source | Status |';
+  echo '|----|-----|--------|---------|-----------------|--------|--------|'; } > "$SP/findings/FINDINGS.md"
+python3 "$FORGE/gate.py" --config "$SP/kbforge.yaml" --banner | grep -q 'unreviewed' \
+  && ok "banner shows unreviewed commits" || bad "banner shows unreviewed commits"
+
+echo "== gate: corrupt FINDINGS.md fails closed (M1) =="
+KB="$TMP/corrupt"; mkkb "$KB" 3 14
+{ echo '| ID | Name |';
+  echo '|----|------|';
+  echo 'junk unparseable row, no Sev column at all'; } > "$KB/findings/FINDINGS.md"
+python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" 2>/dev/null \
+  && bad "corrupt FINDINGS.md fails closed" || ok "corrupt FINDINGS.md fails closed"
+
+echo "== waive: ratified_through advance, ledger auto-created (I1), staged (I2) =="
+G="$TMP/waiverepo"; SP="$G/.speccraft"
+mkdir -p "$SP/findings" "$SP/kb/derived"   # NOTE: no ledger/ dir — I1
+( cd "$G" && git init -q && git config user.email t@t && git config user.name t )
+printf 'repo: %s\nhigh_debt_ceiling: 0\nhigh_debt_max_age_days: 14\n' "$G" > "$SP/kbforge.yaml"
+printf 'source_commit: def5678\nratified_through: aaa1111\n' > "$SP/kb/derived/inventory.md"
+{ echo '| ID | Sev | Raised | Finding | Evidence (@pin) | Source | Status |';
+  echo '|----|-----|--------|---------|-----------------|--------|--------|';
+  echo "| BUG-001 | High | $OLD | some finding | ev | src | proposed |"; } > "$SP/findings/FINDINGS.md"
+( cd "$G" && git add -A && git commit -qm seed )
+# ratify locally (uncommitted) — old ratified_through (aaa1111) is only in HEAD
+printf 'source_commit: def5678\nratified_through: newxyz9\n' > "$SP/kb/derived/inventory.md"
+python3 "$FORGE/gate.py" --config "$SP/kbforge.yaml" --waive "shipping launch" >/dev/null
+[ -f "$SP/ledger/DEBT-WAIVERS.md" ] && ok "waive creates ledger/ when absent (I1)" || bad "waive creates ledger/ when absent (I1)"
+grep -qE '^- [0-9]{4}-[0-9]{2}-[0-9]{2}  ratified_through aaa1111->newxyz9  deferred: BUG-001  — reason: "shipping launch"' "$SP/ledger/DEBT-WAIVERS.md" \
   && ok "waiver line well-formed" || bad "waiver line well-formed"
+( cd "$G" && git diff --cached --name-only | grep -q DEBT-WAIVERS ) \
+  && ok "waiver file git-staged (I2)" || bad "waiver file git-staged (I2)"
 
 echo "== migrate: backfills Raised from git history, idempotent =="
 MKB="$TMP/mig/.speccraft"; mkdir -p "$MKB/findings" "$MKB/kb/derived"
@@ -86,7 +120,7 @@ G="$TMP/repo"; SP="$G/.speccraft"
 mkdir -p "$SP/findings" "$SP/kb/derived" "$SP/ledger"
 ( cd "$G" && git init -q && git config user.email t@t && git config user.name t )
 printf 'repo: %s\nhigh_debt_ceiling: 0\nhigh_debt_max_age_days: 14\n' "$G" > "$SP/kbforge.yaml"
-printf 'source_commit: aaaaaaa\n' > "$SP/kb/derived/inventory.md"
+printf 'source_commit: aaaaaaa\nratified_through: aaaaaaa\n' > "$SP/kb/derived/inventory.md"
 { echo '| ID | Sev | Raised | Finding | Evidence (@pin) | Source | Status |';
   echo '|----|-----|--------|---------|-----------------|--------|--------|';
   echo "| BUG-001 | High | $(date +%F) | x | ev | src | proposed |"; } > "$SP/findings/FINDINGS.md"
@@ -96,7 +130,7 @@ export KBFORGE_HOME="$FORGE"
 # tripping the debt gate (FINDINGS.md already has an open HIGH over ceiling 0)
 ( cd "$G" && git add -A && KB_SHIPLOOP=1 git commit -qm "seed" )
 # advance the pin -> should be BLOCKED (1 open HIGH > ceiling 0)
-printf 'source_commit: bbbbbbb\n' > "$SP/kb/derived/inventory.md"
+printf 'source_commit: bbbbbbb\nratified_through: bbbbbbb\n' > "$SP/kb/derived/inventory.md"
 if ( cd "$G" && git add -A && KB_RATIFY=1 git commit -qm "advance pin" ) 2>/dev/null; then
   bad "pre-commit blocks pin advance under debt"
 else
