@@ -19,6 +19,17 @@ atomically in one commit, and one clone/push carries both. First deployment:
    never the working tree. A dirty mid-session tree is invisible to the KB;
    uncommitted code is not a fact. The pin is the **last code commit**
    (`git log -1 -- . ':(exclude).speccraft'`), so KB-only commits never move it.
+
+   `kb/derived/inventory.md` carries two anchors, not one:
+   - `source_commit` — the mechanical pin above; advanced every commit by the
+     ship loop (`seed0.py`), ungated. What `drift.py` diffs the working tree
+     against.
+   - `ratified_through` — the trust boundary; advanced only by `ratify`
+     (`gate.py`), which refuses the advance while open HIGH findings exceed
+     `high_debt_ceiling` or `high_debt_max_age_days` (waivable, logged to
+     `ledger/DEBT-WAIVERS.md`). "The KB is reviewed-and-clean through here."
+     The KB is caught up when `ratified_through == source_commit` and no HIGH
+     debt is open; otherwise commits between the two anchors are unreviewed.
 3. **Cite or it didn't happen** — every claim carries `path:line @<pin>`.
 4. **Provenance is never blurred**, and nothing becomes `ratified` except by
    the founder (via QUEUE.md; the ruling commit is the audit record).
@@ -29,11 +40,20 @@ atomically in one commit, and one clone/push carries both. First deployment:
 ## KB layout (`<product>/.speccraft/`)
 
     kbforge.yaml          product profile: repo path, components, risk_paths
+
+- `high_debt_ceiling` (default 3) — max open HIGH findings before a
+  `ratified_through` advance is refused. Set 0 for zero-tolerance.
+- `high_debt_max_age_days` (default 14) — any open HIGH finding older than this
+  (by its `Raised` date) refuses a `ratified_through` advance. `source_commit`
+  (the mechanical pin) is never gated — see the two-anchor note above.
+
     README.md             trust rules
     QUEUE.md              the one adjudication queue (doc 09); founder rulings
     ledger/DIV-*.md       ruled divergences (fix-code / fix-model / accepted-deviation)
     findings/FINDINGS.md  consolidated bug/work list — proposed→confirmed→fixed
                           (agents append `proposed`; only KB_RATIFY sets confirmed)
+                          `Raised` column (ISO date, stamped on append, never changed);
+                          open HIGH findings gate `ratified_through` advance (see `gate.py`)
     kb/derived/           machine-harvested, provenance=derived, regenerated
                           wholesale on re-pin — never hand-edited
     kb/normative/         elicited intent & invariants (founder interviews)

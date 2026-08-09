@@ -399,5 +399,19 @@ if run_section queuesplit; then
   fi
 fi
 
+# ---------- section: queue-teeth (high-debt gate enforcement) ----------
+if run_section queueteeth; then
+  echo "== queue-teeth suite =="
+  QTOUT=$(bash "$HERE/test-queue-teeth.sh" 2>&1); QTRC=$?
+  printf '%s\n' "$QTOUT"
+  QTP=$(printf '%s' "$QTOUT" | grep -Eo '[0-9]+ passed' | tail -1 | grep -Eo '[0-9]+')
+  QTF=$(printf '%s' "$QTOUT" | grep -Eo '[0-9]+ failed' | tail -1 | grep -Eo '[0-9]+')
+  PASS=$((PASS + ${QTP:-0})); FAIL=$((FAIL + ${QTF:-0}))
+  if [ "$QTRC" -ne 0 ] && [ "${QTF:-0}" -eq 0 ]; then
+    # suite failed but gave no parseable failure count — still must fail self-test
+    no "queueteeth: test-queue-teeth.sh exited nonzero ($QTRC)"
+  fi
+fi
+
 echo "self-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

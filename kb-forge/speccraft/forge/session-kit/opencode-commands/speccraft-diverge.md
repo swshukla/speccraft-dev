@@ -16,11 +16,21 @@ description: Use when the task at hand requires violating or contradicting a rat
       line>. Proposed ruling: fix-code | fix-model | accepted-deviation.
    ```
 
+   Divergences are recorded ONLY in `QUEUE.md` under `## Open` (the human lane).
+   Never write to `SIGNALS.md` — that file is a machine-owned projection of drift,
+   rewritten on every drift run, and any hand-edit will be overwritten.
+
 3. If the divergence is a defect (crash, data loss, security, wrong behaviour,
    ledger-integrity), also append a `proposed` BUG-NNN row to
-   `.speccraft/findings/FINDINGS.md` (severity + evidence `path:line` + source),
-   so it appears on the consolidated worklist. `proposed` ≠ confirmed — the
-   founder confirms via `speccraft-ratify`.
+   `.speccraft/findings/FINDINGS.md`. Append the finding using the current
+   schema — note the `Raised` column:
+
+   | ID | Sev | Raised | Finding | Evidence (@pin) | Source | Status |
+
+   Set `Raised` to today's date (`YYYY-MM-DD`) when you first append the row, and
+   NEVER change it afterwards — it is the "raised" date the HIGH-debt age gate
+   reads. Bump the `<!-- Next id: BUG-NNN … -->` marker as before. `proposed` ≠
+   confirmed — the founder confirms via `speccraft-ratify`.
 4. If parts of the task don't depend on the ruling, continue those; leave the
    conflicting part unimplemented with a `TODO(speccraft-diverge #N)` marker.
 4. The founder rules via **speccraft-ratify**; fix-model updates the KB, fix-code

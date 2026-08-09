@@ -22,7 +22,9 @@ description: Founder-only — use when the founder wants to answer adjudication 
      a new BUG-NNN row if the finding isn't there yet), with severity, evidence
      `path:line`, and the source. This is the ONE place `confirmed` may be set,
      and only in this ratify commit (`KB_RATIFY=1`) — so the worklist's audit
-     trail shows a human stood behind each bug.
+     trail shows a human stood behind each bug. Preserve the existing `Raised`
+     value unchanged when flipping `Status` (proposed → confirmed/dismissed);
+     only `Status` changes.
    - **`accepted-deviation` / not-a-bug** → set the FINDINGS row to `dismissed`
      (the reasoning lives in `ledger/`).
    - **Convention accepted** → add to `kb/normative/03-conventions.md` with
@@ -30,7 +32,28 @@ description: Founder-only — use when the founder wants to answer adjudication 
    - **Hypothesis killed** → mark it killed in place with a one-line reason
      (do not delete — the kill is part of the record).
 4. Move each answered item to `## Ruled — <date>` in QUEUE.md with a one-line
-   summary and where the ruling landed.
+   summary and where the ruling landed. After adjudicating the findings, advance
+   the trust boundary: set `ratified_through:` in `kb/derived/inventory.md` to
+   the current `source_commit:` value ("the KB is reviewed and clean through
+   here"). Do NOT touch `source_commit` — the ship loop owns it.
+
+   Before advancing, run the HIGH-debt gate:
+
+   ```
+   python3 <forge>/gate.py --config <kbroot>/kbforge.yaml
+   ```
+
+   If it exits 0, advance `ratified_through` and commit (`KB_RATIFY=1`). If it
+   BLOCKS, either fix the HIGH findings first, or record a waiver (which git-adds
+   itself and authorizes this one advance):
+
+   ```
+   python3 <forge>/gate.py --config <kbroot>/kbforge.yaml --waive "why you're deferring"
+   ```
+
+   The pre-commit hook enforces this: advancing `ratified_through` under HIGH
+   debt without a matching waiver is refused.
+
 5. Commit: `KB_RATIFY=1 git commit -m "kb: rulings <date>" -- .speccraft`
    (the pre-commit lane guard requires the flag for normative/ledger writes).
 

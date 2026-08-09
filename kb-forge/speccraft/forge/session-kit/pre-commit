@@ -11,6 +11,24 @@ FORGE="${KBFORGE_HOME:-$HOME/.speccraft/kb-forge}"
 if [ -n "$KB_RATIFY" ]; then
   git diff --cached --name-only | grep -qE '^.speccraft/(kb/normative/|ledger/)' \
     && kb_telemetry ratify_used
+
+  # --- HIGH-debt gate: refuse advancing ratified_through while HIGH debt is over ceiling/age ---
+  if git diff --cached -- "$KB/kb/derived/inventory.md" | grep -q '^+ratified_through:'; then
+    NEWRT=$(git diff --cached -- "$KB/kb/derived/inventory.md" \
+             | sed -nE 's/^\+ratified_through:[[:space:]]*([^[:space:]]+).*/\1/p' | head -1)
+    if ! python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" >/dev/null 2>&1; then
+      if git diff --cached -- "$KB/ledger/DEBT-WAIVERS.md" | grep -qE "^\+.*->[[:space:]]*${NEWRT}([[:space:]]|\$)"; then
+        :   # a staged waiver names this new ratified_through — authorized deferral
+      else
+        echo "pre-commit: HIGH-debt gate blocks advancing ratified_through to ${NEWRT}." >&2
+        python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" >&2 || true
+        echo "  Fix the HIGH findings, or record a waiver:" >&2
+        echo "  python3 $FORGE/gate.py --config $KB/kbforge.yaml --waive \"reason\"" >&2
+        exit 1
+      fi
+    fi
+  fi
+
   exit 0
 fi
 git rev-parse --verify HEAD >/dev/null 2>&1 || exit 0   # initial commit: skip

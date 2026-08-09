@@ -53,13 +53,24 @@ def walk(repo):
             if os.path.splitext(f)[1] in CODE_EXT:
                 yield os.path.relpath(os.path.join(root, f), repo)
 
-def header(kind, repo, sha):
+def header(kind, repo, sha, ratified_through=None):
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    rat_line = f"ratified_through: {ratified_through}\n" if ratified_through is not None else ""
     return ("---\n"
             f"provenance: derived\ntool: kb-forge seed0 v0.1\nkind: {kind}\n"
-            f"source_repo: {repo}\nsource_commit: {sha}\ngenerated: {now}\n"
+            f"source_repo: {repo}\nsource_commit: {sha}\n{rat_line}generated: {now}\n"
             "confidence: certain   # deterministic harvest — no inference\n"
             "---\n\n")
+
+def read_ratified_through(path):
+    """Return the existing ratified_through: value from inventory.md, or None if absent."""
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            if line.startswith("ratified_through:"):
+                return line.split(":", 1)[1].strip()
+    return None
 
 RX_FASTAPI = re.compile(r"@(\w+)\.(get|post|put|delete|patch|websocket)\(\s*['\"]([^'\"]+)")
 RX_INCLUDE = re.compile(r"include_router\(\s*([\w.]+)(?:[^)]*prefix\s*=\s*['\"]([^'\"]+))?")
@@ -166,15 +177,24 @@ def main():
         if key in mods:
             mods[key]["churn"] += lines
 
-    def w(name, kind, body):
-        with open(os.path.join(kbdir, name), "w") as fh:
-            fh.write(header(kind, repo, sha) + body)
+    def w(name, kind, body, ratified_through=None):
+        with open(os.path.join(kbdir, name), "w", encoding="utf-8") as fh:
+            fh.write(header(kind, repo, sha, ratified_through) + body)
+
+    # inventory.md is the pin file: preserve its existing ratified_through
+    # trust boundary across re-seeds; if absent (legacy/first seed), init it
+    # to the new source_commit.
+    inventory_path = os.path.join(kbdir, "inventory.md")
+    ratified_through = read_ratified_through(inventory_path)
+    if ratified_through is None:
+        ratified_through = sha
 
     w("inventory.md", "inventory",
       f"# Repo inventory\n\n**Files (code/config):** {len(files)}\n\n## By top-level dir\n"
       + "".join(f"- `{k}/` — {v} files\n" for k, v in sorted(by_top.items(), key=lambda x: -x[1]))
       + "\n## By extension\n"
-      + "".join(f"- `{k}` — {v}\n" for k, v in sorted(by_ext.items(), key=lambda x: -x[1])))
+      + "".join(f"- `{k}` — {v}\n" for k, v in sorted(by_ext.items(), key=lambda x: -x[1])),
+      ratified_through=ratified_through)
 
     w("routes-api.md", "api-surface",
       f"# API surface (FastAPI) — {len(api_routes)} routes\n\n"
