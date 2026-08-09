@@ -37,15 +37,28 @@ def _table_rows(text):
 def open_high(kbroot):
     path = os.path.join(kbroot, FINDINGS)
     if not os.path.exists(path):
-        return []                      # no findings file = no debt (safe)
+        return []                       # no findings file = no debt (clear)
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
-    rows = list(_table_rows(text))
-    if "| ID " in text and not any("sev" in r for r in rows):
-        raise ValueError("FINDINGS.md table unparseable")   # fail closed
-    return [r for r in rows
-            if r.get("sev", "").lower() == "high"
-            and r.get("status", "").lower() in ("proposed", "confirmed")]
+    header = None
+    highs = []
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if header is None:
+            header = [c.lower() for c in cells]
+            continue
+        if set("".join(cells)) <= set("-: "):       # separator row
+            continue
+        if len(cells) != len(header):               # misaligned data row = corrupt
+            raise ValueError(
+                f"FINDINGS.md row has {len(cells)} cells, expected {len(header)}")
+        row = dict(zip(header, cells))
+        if (row.get("sev", "").lower() == "high"
+                and row.get("status", "").lower() in ("proposed", "confirmed")):
+            highs.append(row)
+    return highs
 
 
 def _age_days(raised):

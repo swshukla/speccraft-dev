@@ -52,8 +52,8 @@ KB="$TMP/ban"; mkkb "$KB" 1 14
 addrow "$KB" BUG-001 High "$OLD" proposed
 addrow "$KB" BUG-002 High "$TODAY" proposed
 python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" --banner | grep -q 'BLOCKED' && ok "banner shows BLOCKED" || bad "banner shows BLOCKED"
-KB="$TMP/ban2"; mkkb "$KB" 3 14
-addrow "$KB" BUG-000 High "$OLD" fixed
+KB="$TMP/ban2"; mkkb "$KB" 3 14   # zero data rows: clean KB, must NOT be treated as corrupt
+python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" && ok "zero-row FINDINGS.md is clean, not blocked" || bad "zero-row FINDINGS.md is clean, not blocked"
 python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" --banner | grep -q '0 open HIGH' && ok "banner shows none" || bad "banner shows none"
 
 echo "== banner: unreviewed commits between ratified_through and source_commit =="
@@ -72,9 +72,9 @@ python3 "$FORGE/gate.py" --config "$SP/kbforge.yaml" --banner | grep -q 'unrevie
 
 echo "== gate: corrupt FINDINGS.md fails closed (M1) =="
 KB="$TMP/corrupt"; mkkb "$KB" 3 14
-{ echo '| ID | Name |';
-  echo '|----|------|';
-  echo 'junk unparseable row, no Sev column at all'; } > "$KB/findings/FINDINGS.md"
+{ echo '| ID | Sev | Raised | Finding | Evidence (@pin) | Source | Status |';
+  echo '|----|-----|--------|---------|-----------------|--------|--------|';
+  echo '| BUG-001 | High | broken row |'; } > "$KB/findings/FINDINGS.md"
 python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" 2>/dev/null \
   && bad "corrupt FINDINGS.md fails closed" || ok "corrupt FINDINGS.md fails closed"
 
