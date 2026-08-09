@@ -32,36 +32,27 @@ description: Founder-only — use when the founder wants to answer adjudication 
    - **Hypothesis killed** → mark it killed in place with a one-line reason
      (do not delete — the kill is part of the record).
 4. Move each answered item to `## Ruled — <date>` in QUEUE.md with a one-line
-   summary and where the ruling landed. Before advancing the pin, run the
-   HIGH-debt gate:
+   summary and where the ruling landed. After adjudicating the findings, advance
+   the trust boundary: set `ratified_through:` in `kb/derived/inventory.md` to
+   the current `source_commit:` value ("the KB is reviewed and clean through
+   here"). Do NOT touch `source_commit` — the ship loop owns it.
+
+   Before advancing, run the HIGH-debt gate:
 
    ```
    python3 <forge>/gate.py --config <kbroot>/kbforge.yaml
    ```
 
-   If it exits 0, advance the pin as usual. If it BLOCKS (open HIGH findings over
-   the ceiling or aged past the limit), either fix those HIGH findings first, or —
-   if you are deliberately deferring — record a logged waiver, which authorizes this
-   one pin advance:
+   If it exits 0, advance `ratified_through` and commit (`KB_RATIFY=1`). If it
+   BLOCKS, either fix the HIGH findings first, or record a waiver (which git-adds
+   itself and authorizes this one advance):
 
    ```
    python3 <forge>/gate.py --config <kbroot>/kbforge.yaml --waive "why you're deferring"
    ```
 
-   The waiver is appended to `ledger/DEBT-WAIVERS.md` (committed in this same
-   `KB_RATIFY=1` commit) and names the new pin + the deferred BUG ids — the audit
-   trail. The pre-commit hook enforces this: a pin advance under HIGH debt without a
-   matching waiver is refused. After advancing the `source_commit` pin
-   in `kb/derived/inventory.md`, re-run the drift projection so `SIGNALS.md`
-   reflects the new pin:
-
-   ```
-   python3 <forge>/drift.py --config <kbroot>/kbforge.yaml --queue
-   ```
-
-   This is the existing drift command — no new mechanism. Findings resolved by
-   the new pin drop out of `SIGNALS.md` automatically and are recorded in
-   `QUEUE-ARCHIVE.md`.
+   The pre-commit hook enforces this: advancing `ratified_through` under HIGH
+   debt without a matching waiver is refused.
 
 5. Commit: `KB_RATIFY=1 git commit -m "kb: rulings <date>" -- .speccraft`
    (the pre-commit lane guard requires the flag for normative/ledger writes).
