@@ -7,7 +7,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
-[![No LLM required](https://img.shields.io/badge/harvesters-pure%20stdlib-green.svg)](#quickstart)
+[![No LLM required](https://img.shields.io/badge/harvesters-pure%20stdlib-green.svg)](#getting-started)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-supported-6b46c1.svg)](#multi-tool)
 [![Codex](https://img.shields.io/badge/Codex-supported-10a37f.svg)](#multi-tool)
 [![OpenCode](https://img.shields.io/badge/OpenCode-supported-f97316.svg)](#multi-tool)
@@ -29,7 +29,9 @@ It's built for the hard case — an **existing (brownfield) codebase** whose des
 ## Contents
 
 - [Why it exists](#why-it-exists)
-- [Quickstart](#quickstart)
+- [Getting started](#getting-started)
+- [What gets checked in](#what-gets-checked-in)
+- [The commands](#the-commands)
 - [What it captures](#what-it-captures)
 - [The steady-state loop](#the-steady-state-loop)
 - [Enforcement](#enforcement)
@@ -54,29 +56,130 @@ Speccraft's answer is a **grounded ratchet**: seed a knowledge base from human-a
 
 ---
 
-## Quickstart
+## Getting started
+
+### 1. Install the CLI
 
 ```bash
-pipx install speccraft-cli
-speccraft init /path/to/your-repo
+pipx install speccraft-cli     # or: pip install --user speccraft-cli
+speccraft --help
 ```
+
+> **Requirements:** `python3` ≥ 3.9 and `git`. `jq` is used only to merge Claude Code hook settings into a `.claude/settings.local.json` you already have. No API keys, no services, no LLM calls in the tooling itself — the harvesters are pure stdlib, and speccraft has zero runtime dependencies.
 
 > Want unreleased `main`? `pipx install git+https://github.com/swshukla/speccraft.git` instead.
 
-> **Requirements:** `python3`, `git`. No API keys, no services, no LLM calls in the tooling itself — the harvesters are pure stdlib.
+Upgrading later is `pipx upgrade speccraft-cli`. The CLI is a thin launcher: the substance lives in a `forge/` tree inside the installed package, and `speccraft init` points `~/.speccraft/kb-forge` at it via a symlink so your repo's hooks and skills always resolve to the version you have installed.
 
-`speccraft init` scaffolds `your-repo/.speccraft/`, runs every harvester (pinned to your last code commit), installs the four `speccraft-*` procedures for Claude Code / Codex / OpenCode, wires `AGENTS.md`/`CLAUDE.md`, arms the git hooks, and writes `KB-STATUS.md`.
+### 2. Initialize your repo
 
-From there:
+```bash
+cd /path/to/your-repo
+speccraft init            # or: speccraft init /path/to/your-repo
+```
+
+The target **must be a git repo with at least one commit** — the knowledge base pins every claim to a commit SHA, so there has to be something to pin to. On a brand-new project, commit your starter code first:
+
+```bash
+git init && git add -A && git commit -m "init: snapshot before speccraft"
+```
+
+`init` is **idempotent** — re-running it on a repo that already has `.speccraft/` re-runs the harvesters and re-arms this clone without touching your ratified facts. It never overwrites a git hook or hook-settings block it didn't write; it prints a warning and asks you to merge by hand instead.
+
+What it does, in order:
+
+| | |
+|---|---|
+| **Scaffolds the KB** | `.speccraft/` with `kbforge.yaml` (the product profile), `QUEUE.md` (the single adjudication queue), and the `kb/derived`, `kb/inferred`, `kb/normative`, `kb/decisions`, `ledger/` lanes. |
+| **Harvests ground truth** | Runs `seed0` (structure/routes/models/churn), `assume0` (assumption "scars"), `dup0` (duplication & contradictions), `deps0` (dependency inventory) into `kb/derived/`, all pinned to your current `HEAD`. |
+| **Installs the procedures** | The seven `speccraft-*` skills into `.claude/skills/` (Claude Code), `.agents/skills/` (Codex + OpenCode, via the Agent Skills standard), and `.opencode/commands/`; plus `~/.codex/prompts/` once per machine. |
+| **Wires the agent context** | Appends the KB section to `AGENTS.md` and ensures `CLAUDE.md` imports it with `@AGENTS.md`. |
+| **Arms this clone** | Hook config into `.claude/settings.local.json`, and `pre-commit` / `post-commit` into `.git/hooks/`. |
+| **Writes status** | `.speccraft/KB-STATUS.md`, the at-a-glance briefing every new agent session reads. |
+
+If the [superpowers](https://github.com/anthropics/claude-plugins-official) plugin isn't detected, `init` says so — speccraft's skills assume that workflow discipline (brainstorming, TDD, systematic-debugging) is available, but nothing breaks without it.
+
+### 3. Tune the profile, then commit
+
+Open `.speccraft/kbforge.yaml` and set the two fields marked `EDIT ME`:
+
+```yaml
+components: backend, frontend          # rough hints; the harvesters are heuristic
+test_command: "pytest"
+risk_paths: "auth|login|session|token|payment|billing|subscri"   # paths that deserve paranoia
+```
+
+Then commit the KB and the procedures — see [What gets checked in](#what-gets-checked-in):
+
+```bash
+git add .speccraft .claude/skills .agents .opencode AGENTS.md CLAUDE.md .gitignore
+git commit -m "chore: bootstrap speccraft KB"
+```
+
+### 4. Bootstrap the knowledge (the human-paced part)
+
+Steps 1–3 are mechanical. What follows is the part only you can do, in an agent session (Claude Code, Codex, or OpenCode) opened on the repo:
 
 | Step | Action |
 |:---:|---|
-| 1 | Tune `.speccraft/kbforge.yaml` — set `components` and `risk_paths` (auth / money / truth-critical path patterns). |
-| 2 | Run `speccraft-interview` in a Claude Code (or Codex/OpenCode) session — the one irreducibly human step; intent and invariants land in `kb/normative/` and everything downstream grounds in it. |
-| 3 | Run the extraction passes, then work through `.speccraft/QUEUE.md` with `speccraft-ratify`. |
-| 4 | **It's self-sustaining after that.** Just build — each commit runs the ship loop, drift keeps citations honest, recall grounds each task. |
+| 1 | Run **`speccraft-interview`** — the one irreducibly human step. Intent and invariants land in `kb/normative/` in your own words, and everything downstream grounds in them. |
+| 2 | Run the extraction passes (capability map, data sources, integrations, assumptions, consistency) → `kb/inferred/` as *unratified hypotheses*. |
+| 3 | Work through `.speccraft/QUEUE.md` with **`speccraft-ratify`**. Nothing becomes ratified truth except here, by you. |
+| 4 | **It's self-sustaining after that.** Just build — each commit runs the ship loop, drift keeps citations honest, `speccraft-recall` grounds each task. |
+
+### Joining a repo that already has a KB
+
+Skills, `AGENTS.md` and the KB itself are tracked, so they arrive with the clone. Git hooks and `settings.local.json` are *not* versioned by git — every new clone (and every new machine) has to arm itself:
+
+```bash
+pipx install speccraft-cli
+cd the-repo && speccraft init .        # detects the existing KB, installs hooks only
+```
 
 **Go deeper:** [`speccraft/forge/README.md`](speccraft/forge/README.md) (full walkthrough) · [`speccraft/forge/SPEC.md`](speccraft/forge/SPEC.md) (system reference) · [`speccraft/forge/workflow-execution.html`](speccraft/forge/workflow-execution.html) (visual tour)
+
+---
+
+## What gets checked in
+
+**Yes — commit `.speccraft/`.** The knowledge base is the point: it's versioned truth that travels with the code, reviewable in pull requests, and pinned to the same history. A KB outside the repo would drift the moment someone else pushed.
+
+| Path | Commit it? | Why |
+|---|:---:|---|
+| `.speccraft/` (KB, queue, ledger, decisions) | **yes** | The knowledge base. Its diffs are the audit record of what was ratified, when, by whom. |
+| `.claude/skills/`, `.agents/skills/`, `.opencode/commands/` | **yes** | The `speccraft-*` procedures. Tracking them means teammates and CI agents get the same behavior. |
+| `AGENTS.md`, `CLAUDE.md` | **yes** | Cross-agent rules that point sessions at the KB. |
+| `.gitignore` (one added line) | **yes** | Excludes the telemetry log below. |
+| `.speccraft/evals/telemetry.jsonl` | no — auto-ignored | Per-machine usage log; `init` adds it to `.gitignore` for you. |
+| `.claude/settings.local.json` | no | Per-clone hook wiring, machine-specific by convention. |
+| `.git/hooks/pre-commit`, `post-commit` | can't | Git never versions hooks. Re-run `speccraft init .` per clone. |
+| `~/.speccraft/kb-forge`, `~/.codex/prompts/` | n/a | Outside the repo — created per machine by `init`. |
+
+The `post-commit` ship loop makes its own `kb: ship-loop re-pin @<sha>` commits touching only `.speccraft/`. That's expected: it re-pins citations, flags drift, and refreshes `KB-STATUS.md` after each of your commits. It is guarded against recursion, skips linked worktrees, and never blocks you — it runs in the background.
+
+---
+
+## The commands
+
+The CLI itself has exactly one subcommand — everything else is a **procedure your agent runs**, installed by `init` and invoked by name in a session.
+
+```
+speccraft init [repo]     scaffold / re-arm a .speccraft/ KB   (default repo: .)
+```
+
+In Claude Code the skills fire by name (or automatically, when their description matches what you're doing). In Codex and OpenCode, `/speccraft-<name>`.
+
+| Procedure | When to run it |
+|---|---|
+| **`speccraft-recall`** | **Before touching any module**, and before adding an integration or data fetch. Pulls the trust-graded facts governing the code you're about to change. This is the one you'll use every session. |
+| **`speccraft-decide`** | The moment you make a tradeoff — fixing a threshold, rejecting an alternative, picking a library. Writes an ADR-lite card to `kb/decisions/`, append-only. |
+| **`speccraft-diverge`** | When the task requires contradicting a ratified fact or `INV-*` invariant — or when you find code that already does. Stops and files it for your ruling instead of proceeding silently. |
+| **`speccraft-interview`** | Bootstrapping the KB, and again whenever product direction shifts. Elicits intent and invariants from you; no code scan can produce these. |
+| **`speccraft-ratify`** | *Founder-only.* Walk `QUEUE.md` and rule on items one at a time. The commit is the audit record. |
+| **`speccraft-prove`** | When someone asks you to prove one named invariant still holds. Re-verifies against current code and renders a cited proof — or refuses and files a divergence if the code contradicts it. |
+| **`speccraft-eval`** | *Founder-only.* Check whether the system is actually working: loop usage, KB truth, behavioral lift. |
+
+Day to day, the shape is: **recall → build → decide/diverge as they come up → commit** (the ship loop handles re-pinning), with **ratify** occasionally when the queue fills up.
 
 ---
 
