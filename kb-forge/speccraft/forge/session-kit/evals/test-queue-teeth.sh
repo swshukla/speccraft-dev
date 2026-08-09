@@ -153,7 +153,22 @@ else
 fi
 unset KBFORGE_HOME
 
-echo "== briefing: leads with HIGH-debt banner =="
+echo "== briefing: two-anchor status — green (caught up) =="
+GKB="$TMP/briefgreen"; mkdir -p "$GKB/.speccraft/findings" "$GKB/.speccraft/kb/derived"
+( cd "$GKB" && git init -q && git config user.email t@t && git config user.name t )
+SPG="$GKB/.speccraft"
+printf 'repo: %s\nhigh_debt_ceiling: 3\nhigh_debt_max_age_days: 14\n' "$GKB" > "$SPG/kbforge.yaml"
+GSHA="$(cd "$GKB" && printf init > f && git add -A && git commit -qm i && git rev-parse --short HEAD)"
+printf 'source_commit: %s\nratified_through: %s\n' "$GSHA" "$GSHA" > "$SPG/kb/derived/inventory.md"
+mkdir -p "$SPG/kb/normative"; printf '# INV\n' > "$SPG/kb/normative/01-invariants.md"
+{ echo '| ID | Sev | Raised | Finding | Evidence (@pin) | Source | Status |';
+  echo '|----|-----|--------|---------|-----------------|--------|--------|'; } > "$SPG/findings/FINDINGS.md"
+export KBFORGE_HOME="$FORGE"
+OUT="$(cd "$GKB" && bash "$FORGE/session-kit/hooks/kb-briefing.sh" 2>/dev/null)"
+unset KBFORGE_HOME
+printf '%s\n' "$OUT" | head -1 | grep -q 'KB caught up' && ok "briefing first line shows KB caught up (green, anchors equal, 0 open HIGH)" || bad "briefing first line shows KB caught up (green, anchors equal, 0 open HIGH)"
+
+echo "== briefing: two-anchor status — behind/blocked =="
 BKB="$TMP/brief"; mkdir -p "$BKB/.speccraft/findings" "$BKB/.speccraft/kb/derived"
 ( cd "$BKB" && git init -q && git config user.email t@t && git config user.name t )
 SP="$BKB/.speccraft"
@@ -166,8 +181,8 @@ mkdir -p "$SP/kb/normative"; printf '# INV\n' > "$SP/kb/normative/01-invariants.
 export KBFORGE_HOME="$FORGE"
 OUT="$(cd "$BKB" && bash "$FORGE/session-kit/hooks/kb-briefing.sh" 2>/dev/null)"
 unset KBFORGE_HOME
-printf '%s\n' "$OUT" | head -1 | grep -q 'HIGH' && ok "briefing first line is HIGH-debt banner" || bad "briefing first line is HIGH-debt banner"
-printf '%s\n' "$OUT" | grep -q 'BLOCKED' && ok "banner shows BLOCKED state" || bad "banner shows BLOCKED state"
+printf '%s\n' "$OUT" | head -1 | grep -q 'KB behind' && ok "briefing first line is KB-behind banner" || bad "briefing first line is KB-behind banner"
+printf '%s\n' "$OUT" | head -1 | grep -q 'BLOCKED' && ok "banner shows BLOCKED state on first line" || bad "banner shows BLOCKED state on first line"
 
 echo "== seed0 preserves ratified_through, inits if absent =="
 SK="$TMP/seed/.speccraft"; mkdir -p "$SK/kb/derived"
