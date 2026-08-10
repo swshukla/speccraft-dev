@@ -207,7 +207,11 @@ every product. kb-forge location override: `KBFORGE_HOME` env.
   lane file → fails open, all edits allowed) — freezing is opt-in, per
   session, orchestrator-controlled. Under Codex/OpenCode there is no
   PreToolUse hook, so the mirrors direct the agent to self-apply the
-  lane boundary as discipline rather than enforcement.
+  lane boundary as discipline rather than enforcement. Documented as the
+  `speccraft-freeze` skill (`session-kit/skills/speccraft-freeze/SKILL.md`),
+  single-sourced and installed to Claude/Codex/OpenCode via the same
+  `speccraft-*` glob as the other procedures; the automatic deny is the
+  Claude-Code `kb-freeze.sh` PreToolUse hook.
 
 **Entry points:** `kbforge-init.sh <repo>` scaffolds .speccraft/ + seeds +
 installs (new product, phases 1–4; phase 5 = judgment bootstrap is
