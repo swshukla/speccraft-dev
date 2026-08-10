@@ -164,8 +164,10 @@ def main():
             continue
         hits = match(anchors, files, set(args.topic))
         status = (meta.get("status") or meta.get("ruling") or "?").split()[0]
-        row = (RANK.get(status, 9), kbf, status, hits, meta)
-        (matched if hits else unmatched).append(row)
+        if hits:
+            matched.append((RANK.get(status, 9), kbf, status, hits, meta))
+        else:
+            unmatched.append((RANK.get(status, 9), kbf, status, hits))
 
     matched.sort(key=lambda r: (r[0], r[1]))
     if not matched:

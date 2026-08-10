@@ -50,5 +50,10 @@ RC=0; python3 "$FORGE/recall.py" --config "$KB/kbforge.yaml" --no-coverage-check
 RC=0; python3 "$FORGE/recall.py" --config "$KB/kbforge.yaml" --no-coverage-check --files backend/nowhere/unknown.py || RC=$?
 [ "$RC" -eq 3 ] && ok "uncovered file exits 3" || bad "uncovered file exits 3 (got $RC)"
 
+echo "== --all with an unmatched fact does not crash =="
+RC=0
+python3 "$FORGE/recall.py" --config "$KB/kbforge.yaml" --all --files backend/app/services/tiers.py >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "--all + unmatched fact no crash" || bad "--all + unmatched fact no crash (exit $RC)"
+
 echo "seams: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
