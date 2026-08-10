@@ -33,6 +33,8 @@ if [ -f "$FREEZE" ]; then
 elif [ -n "${SPECCRAFT_FREEZE:-}" ]; then
   LANES=$(printf '%s\n' $SPECCRAFT_FREEZE)   # word-split env into lines (intentional, unquoted)
 fi
+# keep only non-blank lane prefixes; if none, the session is effectively unfrozen (fail open)
+LANES=$(printf '%s\n' "$LANES" | sed 's/[[:space:]]*$//' | grep -v '^[[:space:]]*$' || true)
 [ -n "$LANES" ] || exit 0                    # unfrozen → allow
 
 inlane=0

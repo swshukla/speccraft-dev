@@ -51,5 +51,10 @@ echo "== --set writes/widens the lane file =="
 ( cd "$G" && KBFORGE_HOME="$FORGE" TMPDIR="$TMP" bash "$HOOK" --set --sid s3 backend/app/billing >/dev/null 2>&1 )
 OUT=$(run "backend/app/billing/charge.py" s3); [ -z "$OUT" ] && ok "--set lane allows" || bad "--set lane"
 
+echo "== blank/whitespace lane file fails OPEN (no block-all) =="
+printf '   \n\t\n \n' > "$TMP/speccraft-freeze-w1"
+OUT=$(run "backend/app/billing.py" w1)
+[ -z "$OUT" ] && ok "whitespace-only lane file -> allow (fail open)" || bad "whitespace lane false-denied"
+
 echo "freeze: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
