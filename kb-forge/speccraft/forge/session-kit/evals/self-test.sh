@@ -427,5 +427,19 @@ if run_section seams; then
   fi
 fi
 
+# ---------- section: freeze (edit-scope freeze) ----------
+if run_section freeze; then
+  echo "== freeze suite =="
+  FZOUT=$(bash "$HERE/test-freeze.sh" 2>&1); FZRC=$?
+  printf '%s\n' "$FZOUT"
+  FZP=$(printf '%s' "$FZOUT" | grep -Eo '[0-9]+ passed' | tail -1 | grep -Eo '[0-9]+')
+  FZF=$(printf '%s' "$FZOUT" | grep -Eo '[0-9]+ failed' | tail -1 | grep -Eo '[0-9]+')
+  PASS=$((PASS + ${FZP:-0})); FAIL=$((FAIL + ${FZF:-0}))
+  if [ "$FZRC" -ne 0 ] && [ "${FZF:-0}" -eq 0 ]; then
+    # suite failed but gave no parseable failure count — still must fail self-test
+    no "freeze: test-freeze.sh exited nonzero ($FZRC)"
+  fi
+fi
+
 echo "self-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

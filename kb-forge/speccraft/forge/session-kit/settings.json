@@ -22,6 +22,11 @@
           },
           {
             "type": "command",
+            "command": "~/.speccraft/kb-forge/session-kit/hooks/kb-freeze.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "~/.speccraft/kb-forge/session-kit/hooks/kb-recall-gate.sh",
             "timeout": 15
           }

@@ -191,7 +191,27 @@ every product. kb-forge location override: `KBFORGE_HOME` env.
   agent to run recall, elicit intent, or file a coverage-gap divergence
   (`speccraft-diverge`) before re-issuing — never guess-and-clone a seam it
   can't see. The ratified-match branch takes precedence; non-risk or
-  covered paths are never denied by this branch.
+  covered paths are never denied by this branch. Also in the same PreToolUse
+  chain, between the git-guard layer and `kb-recall-gate.sh`: `kb-freeze.sh`
+  (edit-scope freeze — see the `speccraft-freeze` procedure below).
+- **Edit-scope freeze** (`speccraft-freeze` procedure, orchestrator-facing):
+  confines a fanned-out sub-agent's edits to an assigned lane of the repo.
+  The orchestrator sets `SPECCRAFT_FREEZE="<space-separated repo-relative
+  path prefixes>"` in the sub-agent's launch env; `kb-briefing.sh`
+  (SessionStart) materializes it into that session's lane file at
+  `${TMPDIR:-/tmp}/speccraft-freeze-<session-id>`; `kb-freeze.sh`
+  (PreToolUse) hard-denies any Edit/Write/MultiEdit outside the lane. A path
+  is in-lane iff it equals a lane prefix exactly or starts with
+  `<prefix>/`. A running session's lane can be widened via `kb-freeze.sh
+  --set --sid <id> <paths…>`. Dormant unless a lane is assigned (no env, no
+  lane file → fails open, all edits allowed) — freezing is opt-in, per
+  session, orchestrator-controlled. Under Codex/OpenCode there is no
+  PreToolUse hook, so the mirrors direct the agent to self-apply the
+  lane boundary as discipline rather than enforcement. Documented as the
+  `speccraft-freeze` skill (`session-kit/skills/speccraft-freeze/SKILL.md`),
+  single-sourced and installed to Claude/Codex/OpenCode via the same
+  `speccraft-*` glob as the other procedures; the automatic deny is the
+  Claude-Code `kb-freeze.sh` PreToolUse hook.
 
 **Entry points:** `kbforge-init.sh <repo>` scaffolds .speccraft/ + seeds +
 installs (new product, phases 1–4; phase 5 = judgment bootstrap is
