@@ -27,8 +27,15 @@ description: Founder-only — use when the founder wants to answer adjudication 
      only `Status` changes.
    - **`accepted-deviation` / not-a-bug** → set the FINDINGS row to `dismissed`
      (the reasoning lives in `ledger/`).
-   - **Convention accepted** → add to `kb/normative/03-conventions.md` with
-     its scope ("banned on money paths, tolerated in pollers").
+   - **Convention accepted** → write a per-convention file
+     `kb/normative/conventions/CONV-NN-<slug>.md` with frontmatter
+     `status: ratified`, `anchors:` (the governed paths and/or `topic:`
+     slugs) and its scope note ("banned on money paths, tolerated in
+     pollers"); for a canonical-symbol seam also set `seam:` (the symbol +
+     how to import it) and `avoid:` (the anti-pattern it replaces —
+     optional `avoid_pattern:`, a grep regex captured for later
+     enforcement, not read today). Then add a one-line index entry (id,
+     title, anchors, seam) to `kb/normative/03-conventions.md`.
    - **Hypothesis killed** → mark it killed in place with a one-line reason
      (do not delete — the kill is part of the record).
 4. Move each answered item to `## Ruled — <date>` in QUEUE.md with a one-line

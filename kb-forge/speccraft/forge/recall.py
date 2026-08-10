@@ -132,6 +132,9 @@ def main():
     ap.add_argument("--coverage-count", action="store_true",
                     help="print '<files-with-coverage> <files-checked>' and "
                          "exit — commit-side recall_eligible proxy")
+    ap.add_argument("--no-coverage-check", action="store_true",
+                    help="Confusion Protocol: exit 3 if NO fact covers the "
+                         "--files, else 0")
     args = ap.parse_args()
     if not args.files and not args.topic:
         sys.exit("give --files and/or --topic")
@@ -149,21 +152,33 @@ def main():
         print(cov, len(files))
         return
 
+    if args.no_coverage_check:
+        # Confusion Protocol: uses all lanes (not restricted to normative).
+        cov = sum(1 for f in files
+                  if any(match(a, [f], set(args.topic)) for _, _, a in facts))
+        sys.exit(3 if cov == 0 else 0)
+
     matched, unmatched = [], []
     for kbf, meta, anchors in facts:
         if lanes and not any(kbf.startswith(f"kb/{l}/") for l in lanes):
             continue
         hits = match(anchors, files, set(args.topic))
         status = (meta.get("status") or meta.get("ruling") or "?").split()[0]
-        row = (RANK.get(status, 9), kbf, status, hits)
-        (matched if hits else unmatched).append(row)
+        if hits:
+            matched.append((RANK.get(status, 9), kbf, status, hits, meta))
+        else:
+            unmatched.append((RANK.get(status, 9), kbf, status, hits))
 
-    matched.sort()
+    matched.sort(key=lambda r: (r[0], r[1]))
     if not matched:
         print("NO KB COVERAGE for the given loci — the palace has no room here.")
         print("Elicit intent or run archaeology before building on this ground.")
-    for _, kbf, status, hits in matched:
+    for _, kbf, status, hits, meta in matched:
         print(f"[{status:<20}] {kbf}   <- {', '.join(hits)}")
+        if meta.get("seam"):
+            print(f"        → USE: {meta['seam']}")
+        if meta.get("avoid"):
+            print(f"        → AVOID: {meta['avoid']}")
     if args.all and unmatched:
         print("\n(no anchor match:)")
         for _, kbf, status, _ in sorted(unmatched):

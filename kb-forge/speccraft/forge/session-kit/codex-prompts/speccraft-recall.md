@@ -25,11 +25,23 @@ canonical procedure also lives at `.agents/skills/speccraft-recall/SKILL.md`.)
      contradicts; a contradiction is a QUEUE item, not a free pass.
    - `pending-ratification` → context, not law; do not cite as ground truth.
    - `challenged` → actively distrust; verify against code before relying.
-4. If the output says **NO KB COVERAGE** and any target path matches the
-   `risk_paths` in `.speccraft/kbforge.yaml`: stop. Check
-   `.speccraft/kb/inferred/05-data-sources.md` and `06-integrations.md` for
-   existing capability, then append a coverage-gap note to `.speccraft/QUEUE.md`
-   before proceeding.
-5. Before ANY new external dependency, data fetch, or cross-component call:
+4. If a matched fact carries a seam, recall renders it as `→ USE: <seam>` /
+   `→ AVOID: <avoid>` under the fact. That is a canonical seam: import/use
+   the named symbol, don't clone or reinvent it. Treat `avoid` as a defect
+   pattern — code matching it is a **speccraft-diverge** candidate, not
+   something to imitate.
+5. If the output says **NO KB COVERAGE** and any target path matches the
+   `risk_paths` in `.speccraft/kbforge.yaml`: stop — this is the Confusion
+   Protocol. The recall gate (`kb-recall-gate.sh`) denies-once on exactly
+   this condition (risk-tagged path, no coverage in any lane), because a
+   canonical seam may exist that isn't visible from here. Don't
+   guess-and-clone. Instead: re-run this procedure, elicit the intent from
+   the user, or file a coverage-gap divergence (**speccraft-diverge**)
+   naming the path — then re-issue the edit; the gate clears after the
+   first denial. (Under Claude Code an automatic PreToolUse hook enforces
+   this deny; Codex sessions don't get that hook, so self-apply it here —
+   if you're about to edit a risk-tagged path with no recall coverage,
+   stop and run recall/elicit/diverge before editing.)
+6. Before ANY new external dependency, data fetch, or cross-component call:
    read 05-data-sources.md and 06-integrations.md — the capability or the
    data probably already exists; reuse beats reinvention.

@@ -57,6 +57,19 @@ atomically in one commit, and one clone/push carries both. First deployment:
     kb/derived/           machine-harvested, provenance=derived, regenerated
                           wholesale on re-pin — never hand-edited
     kb/normative/         elicited intent & invariants (founder interviews)
+    kb/normative/conventions/CONV-NN-<slug>.md
+                          one ratified convention per file: `status`,
+                          `anchors` (paths / `topic:` slugs), and — for a
+                          canonical-symbol seam — `seam:` (the symbol to
+                          use) / `avoid:` (the anti-pattern it replaces) /
+                          optional `avoid_pattern:` (grep regex, captured
+                          for later enforcement — Phase 4/5, not read
+                          today). `recall.py` renders a seam match as
+                          `→ USE: <seam>` / `→ AVOID: <avoid>` under the
+                          fact. `03-conventions.md` stays a human-maintained
+                          index (ratify adds one line per CONV by hand);
+                          recall matches against the per-file frontmatter,
+                          not the index.
     kb/inferred/          agent-drafted claims, status=pending-ratification
     kb/decisions/         (planned) ADR-lite capture-at-decision-time lane
 
@@ -170,7 +183,15 @@ every product. kb-forge location override: `KBFORGE_HOME` env.
 - Claude-only live hooks (`.claude/settings.local.json`, untracked):
   SessionStart briefing injection; PostToolUse recall-on-contact (anchored
   facts injected after each Edit/Write, deduped, incl. subagents); PreToolUse
-  edit-time lane deny (friendly early layer before the git guard).
+  edit-time lane deny (friendly early layer before the git guard) —
+  `kb-recall-gate.sh` denies-once on a ratified-fact match, and, as a second
+  branch, denies-once under the **Confusion Protocol**: a risk-tagged path
+  (`risk_paths` in `kbforge.yaml`) with NO KB coverage in any lane
+  (`recall.py --no-coverage-check`, exit 3) is denied once, instructing the
+  agent to run recall, elicit intent, or file a coverage-gap divergence
+  (`speccraft-diverge`) before re-issuing — never guess-and-clone a seam it
+  can't see. The ratified-match branch takes precedence; non-risk or
+  covered paths are never denied by this branch.
 
 **Entry points:** `kbforge-init.sh <repo>` scaffolds .speccraft/ + seeds +
 installs (new product, phases 1–4; phase 5 = judgment bootstrap is

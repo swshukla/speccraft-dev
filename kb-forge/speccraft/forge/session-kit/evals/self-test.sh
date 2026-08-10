@@ -413,5 +413,19 @@ if run_section queueteeth; then
   fi
 fi
 
+# ---------- section: seams (seam-aware recall gate) ----------
+if run_section seams; then
+  echo "== seams suite =="
+  SMOUT=$(bash "$HERE/test-seams.sh" 2>&1); SMRC=$?
+  printf '%s\n' "$SMOUT"
+  SMP=$(printf '%s' "$SMOUT" | grep -Eo '[0-9]+ passed' | tail -1 | grep -Eo '[0-9]+')
+  SMF=$(printf '%s' "$SMOUT" | grep -Eo '[0-9]+ failed' | tail -1 | grep -Eo '[0-9]+')
+  PASS=$((PASS + ${SMP:-0})); FAIL=$((FAIL + ${SMF:-0}))
+  if [ "$SMRC" -ne 0 ] && [ "${SMF:-0}" -eq 0 ]; then
+    # suite failed but gave no parseable failure count — still must fail self-test
+    no "seams: test-seams.sh exited nonzero ($SMRC)"
+  fi
+fi
+
 echo "self-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
