@@ -64,10 +64,13 @@ printf 'source_commit: %s\n' "$(cd "$BF" && printf x>f && git add -A && git comm
 printf '# INV\n' > "$BF/.speccraft/kb/normative/01-invariants.md"
 OUT=$(printf '{"session_id":"bs1"}' | ( cd "$BF" && KBFORGE_HOME="$FORGE" TMPDIR="$TMP" SPECCRAFT_FREEZE="backend/worker/crypto" bash "$FORGE/session-kit/hooks/kb-briefing.sh" 2>/dev/null ))
 [ -f "$TMP/speccraft-freeze-bs1" ] && grep -q 'backend/worker/crypto' "$TMP/speccraft-freeze-bs1" && ok "SessionStart materialized lane file" || bad "materialize"
-printf '%s' "$OUT" | grep -qi 'lane' && ok "briefing shows active lane" || bad "briefing shows lane"
+printf '%s' "$OUT" | grep -q '🔒 edit lane' && ok "briefing shows active lane" || bad "briefing shows active lane"
 # no env -> no file
 printf '{"session_id":"bs2"}' | ( cd "$BF" && KBFORGE_HOME="$FORGE" TMPDIR="$TMP" bash "$FORGE/session-kit/hooks/kb-briefing.sh" >/dev/null 2>&1 )
 [ ! -f "$TMP/speccraft-freeze-bs2" ] && ok "no env -> no lane file" || bad "no env no file"
+# no env -> no freeze marker in briefing output (non-vacuous negative for the check above)
+NOENV=$(printf '{"session_id":"bs3"}' | ( cd "$BF" && KBFORGE_HOME="$FORGE" TMPDIR="$TMP" bash "$FORGE/session-kit/hooks/kb-briefing.sh" 2>/dev/null ))
+printf '%s' "$NOENV" | grep -q '🔒 edit lane' && bad "no-env briefing wrongly shows lane" || ok "no-env briefing hides lane"
 
 echo "freeze: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
