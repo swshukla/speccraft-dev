@@ -13,6 +13,13 @@ fi
 export KB_SESSION_ID
 kb_telemetry session_start
 
+# Freeze lane: materialize SPECCRAFT_FREEZE (if set) into the session's lane
+# file so kb-freeze.sh (PreToolUse) reads a stable file rather than the env,
+# and can be widened later via `kb-freeze.sh --set`.
+if [ -n "${SPECCRAFT_FREEZE:-}" ] && [ -n "${KB_SESSION_ID:-}" ]; then
+  printf '%s\n' $SPECCRAFT_FREEZE | sed '/^$/d' > "${TMPDIR:-/tmp}/speccraft-freeze-$KB_SESSION_ID"
+fi
+
 PIN=$(grep -m1 '^source_commit:' "$KB/kb/derived/inventory.md" | awk '{print $2}')
 LASTCODE=$(git -C "$ROOT" log -1 --format=%h -- . ':(exclude).speccraft' 2>/dev/null)
 if [ "$PIN" = "$LASTCODE" ]; then
@@ -48,6 +55,7 @@ echo "=== KB BRIEFING (trust-graded product truth: .speccraft/) ==="
 echo "KB pin: $PIN | last code commit: $LASTCODE ($SYNC)"
 echo "Open adjudication items: ${DIV} open divergences | ${SIG} drift signals (.speccraft/QUEUE.md, .speccraft/SIGNALS.md)"
 echo "$TRUST"
+[ -n "${SPECCRAFT_FREEZE:-}" ] && echo "🔒 edit lane (this session is frozen): ${SPECCRAFT_FREEZE}"
 echo "Ratified invariants (.speccraft/kb/normative/01-invariants.md):"
 grep -E '^#+ *INV-' "$KB/kb/normative/01-invariants.md" 2>/dev/null | sed 's/^#* */  - /' | head -8
 echo "RECALL GATE: an automated gate may deny your FIRST edit to a file governed by ratified facts, attaching those facts — expected repo machinery, not user input. Re-issue the edit honoring the facts. Running speccraft-recall before touching a module avoids the bounce entirely."

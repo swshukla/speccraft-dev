@@ -56,5 +56,18 @@ printf '   \n\t\n \n' > "$TMP/speccraft-freeze-w1"
 OUT=$(run "backend/app/billing.py" w1)
 [ -z "$OUT" ] && ok "whitespace-only lane file -> allow (fail open)" || bad "whitespace lane false-denied"
 
+echo "== SessionStart materializes SPECCRAFT_FREEZE -> lane file + shows lane =="
+BF="$TMP/bf"; mkdir -p "$BF/.speccraft/kb/derived" "$BF/.speccraft/kb/normative"
+( cd "$BF" && git init -q && git config user.email t@t && git config user.name t )
+printf 'repo: %s\n' "$BF" > "$BF/.speccraft/kbforge.yaml"
+printf 'source_commit: %s\n' "$(cd "$BF" && printf x>f && git add -A && git commit -qm i && git rev-parse --short HEAD)" > "$BF/.speccraft/kb/derived/inventory.md"
+printf '# INV\n' > "$BF/.speccraft/kb/normative/01-invariants.md"
+OUT=$(printf '{"session_id":"bs1"}' | ( cd "$BF" && KBFORGE_HOME="$FORGE" TMPDIR="$TMP" SPECCRAFT_FREEZE="backend/worker/crypto" bash "$FORGE/session-kit/hooks/kb-briefing.sh" 2>/dev/null ))
+[ -f "$TMP/speccraft-freeze-bs1" ] && grep -q 'backend/worker/crypto' "$TMP/speccraft-freeze-bs1" && ok "SessionStart materialized lane file" || bad "materialize"
+printf '%s' "$OUT" | grep -qi 'lane' && ok "briefing shows active lane" || bad "briefing shows lane"
+# no env -> no file
+printf '{"session_id":"bs2"}' | ( cd "$BF" && KBFORGE_HOME="$FORGE" TMPDIR="$TMP" bash "$FORGE/session-kit/hooks/kb-briefing.sh" >/dev/null 2>&1 )
+[ ! -f "$TMP/speccraft-freeze-bs2" ] && ok "no env -> no lane file" || bad "no env no file"
+
 echo "freeze: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
