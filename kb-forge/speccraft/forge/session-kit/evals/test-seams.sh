@@ -59,7 +59,8 @@ echo "== Confusion Protocol gate =="
 # gate.sh's dedup cache is keyed by session id alone (${TMPDIR}/speccraft-recall-seen-$SID),
 # not by repo — sweep any stale cache from a prior run of this suite so s1..s4 are fresh here.
 rm -f "${TMPDIR:-/tmp}/speccraft-recall-seen-s1" "${TMPDIR:-/tmp}/speccraft-recall-seen-s2" \
-      "${TMPDIR:-/tmp}/speccraft-recall-seen-s3" "${TMPDIR:-/tmp}/speccraft-recall-seen-s4"
+      "${TMPDIR:-/tmp}/speccraft-recall-seen-s3" "${TMPDIR:-/tmp}/speccraft-recall-seen-s4" \
+      "${TMPDIR:-/tmp}/speccraft-recall-seen-s9"
 GKB="$TMP/gate/.speccraft"; mkdir -p "$GKB/kb/normative/conventions" "$GKB/kb/derived"
 ( cd "$TMP/gate" && git init -q && git config user.email t@t && git config user.name t )
 printf 'repo: %s\nrisk_paths: "auth|payment|tier|billing"\n' "$TMP/gate" > "$GKB/kbforge.yaml"
@@ -101,6 +102,21 @@ avoid: "raw User.tier"
 EOF
 OUT=$(run_gate "backend/app/tier_gate.py" s4)
 printf '%s' "$OUT" | grep -q '"permissionDecision":"deny"' && printf '%s' "$OUT" | grep -q 'effective_tier' && ok "ratified seam denies with USE/AVOID (precedence)" || bad "ratified seam precedence"
+
+echo "== broken coverage check fails OPEN (no false deny) =="
+# a risk path that IS covered, but make the covering fact unreadable so recall.py errors
+# (exit 1, not 3) — the gate must fail OPEN, not treat a broken check as no-coverage.
+cat > "$GKB/kb/normative/conventions/CONV-x.md" <<'EOF'
+---
+status: observed
+anchors: [backend/app/tier_broken.py]
+---
+## x
+EOF
+chmod 000 "$GKB/kb/normative/conventions/CONV-x.md"
+OUT=$(run_gate "backend/app/tier_broken.py" s9)
+chmod 644 "$GKB/kb/normative/conventions/CONV-x.md"   # restore so cleanup works
+[ -z "$OUT" ] && ok "broken check fails open (no deny)" || bad "broken check false-denied"
 
 echo "seams: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -44,9 +44,9 @@ fi
 # ── Confusion Protocol: risk-tagged path with NO coverage (any lane) → deny once ──
 RISK=$(grep -m1 '^risk_paths:' "$KB/kbforge.yaml" | cut -d: -f2- | tr -d ' "')
 if [ -n "$RISK" ] && printf '%s' "$REL" | grep -qE "$RISK" 2>/dev/null; then
-  if python3 "$FORGE/recall.py" --config "$KB/kbforge.yaml" --no-coverage-check --files "$REL" >/dev/null 2>&1; then
-    :   # exit 0 = covered by some fact — allow, no deny
-  else
+  python3 "$FORGE/recall.py" --config "$KB/kbforge.yaml" --no-coverage-check --files "$REL" >/dev/null 2>&1
+  rc=$?
+  if [ "$rc" -eq 3 ]; then
     echo "$REL" >> "$CACHE"   # deny at most once: the retry passes
     export KB_SESSION_ID="$SID"
     kb_telemetry recall_gate_nocoverage "$REL"
@@ -58,5 +58,6 @@ $REL is a risk-tagged path (auth/payment/tier/billing/…) and NO KB fact — ra
       '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
     exit 0
   fi
+  # rc==0 (covered) OR any other rc (broken check) → fall through → allow (fail open)
 fi
 exit 0
