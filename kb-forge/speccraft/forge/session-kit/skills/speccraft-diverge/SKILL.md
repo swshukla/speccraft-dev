@@ -20,6 +20,17 @@ description: Use when the task at hand requires violating or contradicting a rat
    Never write to `SIGNALS.md` — that file is a machine-owned projection of drift,
    rewritten on every drift run, and any hand-edit will be overwritten.
 
+   **Coverage-gap variant:** if the recall gate's Confusion Protocol denied
+   an edit for no KB coverage on a risk-tagged path, and the intent can't be
+   elicited from the user inline, file it the same way — a `## Open` item
+   naming the path and the decision needed:
+
+   ```
+   N. **Coverage gap: <path>** — risk-tagged, no KB coverage in any lane
+      (recall gate Confusion Protocol). Decision needed: <what canonical
+      seam/approach should govern this path>.
+   ```
+
 3. If the divergence is a defect (crash, data loss, security, wrong behaviour,
    ledger-integrity), also append a `proposed` BUG-NNN row to
    `.speccraft/findings/FINDINGS.md`. Append the finding using the current
