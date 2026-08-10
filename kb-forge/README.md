@@ -116,16 +116,25 @@ git add .speccraft .claude/skills .agents .opencode AGENTS.md CLAUDE.md .gitigno
 git commit -m "chore: bootstrap speccraft KB"
 ```
 
-### 4. Bootstrap the knowledge (the human-paced part)
+### 4. Run `speccraft-interview` — do this before anything else
 
-Steps 1–3 are mechanical. What follows is the part only you can do, in an agent session (Claude Code, Codex, or OpenCode) opened on the repo:
+`init` harvested what a machine can see. It cannot see **intent**. Open an agent session (Claude Code, Codex, or OpenCode) on the repo and run:
+
+```
+speccraft-interview
+```
+
+This is the one irreducibly human step, and setup isn't finished without it. Your goals, constraints and invariants land in `.speccraft/kb/normative/` as `elicited` facts *in your own words* — and every extraction pass, every ratification, every `speccraft-recall` downstream grounds in them. Run it later and you re-do that work; skip it and the agents are guessing at intent again, which is the whole problem speccraft exists to solve. Re-run it whenever product direction shifts.
+
+### 5. Bootstrap the rest of the knowledge (the human-paced part)
+
+Steps 1–4 are setup. What follows is the part only you can do, in that same agent session:
 
 | Step | Action |
 |:---:|---|
-| 1 | Run **`speccraft-interview`** — the one irreducibly human step. Intent and invariants land in `kb/normative/` in your own words, and everything downstream grounds in them. |
-| 2 | Run the extraction passes (capability map, data sources, integrations, assumptions, consistency) → `kb/inferred/` as *unratified hypotheses*. |
-| 3 | Work through `.speccraft/QUEUE.md` with **`speccraft-ratify`**. Nothing becomes ratified truth except here, by you. |
-| 4 | **It's self-sustaining after that.** Just build — each commit runs the ship loop, drift keeps citations honest, `speccraft-recall` grounds each task. |
+| 1 | Run the extraction passes (capability map, data sources, integrations, assumptions, consistency) → `kb/inferred/` as *unratified hypotheses*, grounded in the intent you just elicited. |
+| 2 | Work through `.speccraft/QUEUE.md` with **`speccraft-ratify`**. Nothing becomes ratified truth except here, by you. |
+| 3 | **It's self-sustaining after that.** Just build — each commit runs the ship loop, drift keeps citations honest, `speccraft-recall` grounds each task. |
 
 ### Joining a repo that already has a KB
 
