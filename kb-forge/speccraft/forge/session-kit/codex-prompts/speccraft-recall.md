@@ -38,7 +38,10 @@ canonical procedure also lives at `.agents/skills/speccraft-recall/SKILL.md`.)
    guess-and-clone. Instead: re-run this procedure, elicit the intent from
    the user, or file a coverage-gap divergence (**speccraft-diverge**)
    naming the path — then re-issue the edit; the gate clears after the
-   first denial.
+   first denial. (Under Claude Code an automatic PreToolUse hook enforces
+   this deny; Codex sessions don't get that hook, so self-apply it here —
+   if you're about to edit a risk-tagged path with no recall coverage,
+   stop and run recall/elicit/diverge before editing.)
 6. Before ANY new external dependency, data fetch, or cross-component call:
    read 05-data-sources.md and 06-integrations.md — the capability or the
    data probably already exists; reuse beats reinvention.

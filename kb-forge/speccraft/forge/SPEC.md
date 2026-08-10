@@ -66,9 +66,10 @@ atomically in one commit, and one clone/push carries both. First deployment:
                           for later enforcement — Phase 4/5, not read
                           today). `recall.py` renders a seam match as
                           `→ USE: <seam>` / `→ AVOID: <avoid>` under the
-                          fact. `03-conventions.md` stays a generated
-                          human index (one line per CONV); recall matches
-                          against the per-file frontmatter, not the index.
+                          fact. `03-conventions.md` stays a human-maintained
+                          index (ratify adds one line per CONV by hand);
+                          recall matches against the per-file frontmatter,
+                          not the index.
     kb/inferred/          agent-drafted claims, status=pending-ratification
     kb/decisions/         (planned) ADR-lite capture-at-decision-time lane
 
