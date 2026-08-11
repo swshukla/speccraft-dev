@@ -47,12 +47,12 @@ echo "== clean repo: no violations, exit 0 =="
 KB4="$TMP/kb4"; mkkb "$KB4"; addconv "$KB4" CONV-11 '\bUser\.tier\b' 'backend/worker' ""
 CLEAN="$TMP/clean"; mkdir -p "$CLEAN/backend/worker"; printf 'x = effective_tier(user)\n' > "$CLEAN/backend/worker/ok.py"
 sed -i.bak "s#repo: .*#repo: $CLEAN#" "$KB4/kbforge.yaml"
-python3 "$FORGE/check.py" --config "$KB4/kbforge.yaml" 2>&1 | grep -q '0 violation' && ok "clean repo 0 violations" || bad "clean repo"
+python3 "$FORGE/check.py" --config "$KB4/kbforge.yaml" 2>&1 | grep -q 'speccraft-check: 0 violations' && ok "clean repo 0 violations" || bad "clean repo"
 
 echo "== convention without avoid_pattern is skipped =="
 KB5="$TMP/kb5"; mkkb "$KB5"
 { echo '---'; echo 'status: ratified'; echo 'anchors: [backend]'; echo 'seam: "x()"'; echo '---'; echo '## CONV-9'; } > "$KB5/kb/normative/conventions/CONV-9.md"
-python3 "$FORGE/check.py" --config "$KB5/kbforge.yaml" 2>&1 | grep -q '0 violation' && ok "no avoid_pattern → skipped" || bad "skipped"
+python3 "$FORGE/check.py" --config "$KB5/kbforge.yaml" 2>&1 | grep -q 'speccraft-check: 0 violations' && ok "no avoid_pattern → skipped" || bad "skipped"
 
 echo "== custom check script: nonzero → violation, exit0 → pass =="
 KB6="$TMP/kb6"; mkdir -p "$KB6/kb/normative/checks"; printf 'repo: %s\n' "$REPO" > "$KB6/kbforge.yaml"
@@ -74,6 +74,21 @@ exit 0
 EOF
 chmod +x "$KB6/kb/normative/checks/CHK-02-ok.sh"
 python3 "$FORGE/check.py" --config "$KB6/kbforge.yaml" 2>&1 | grep -q 'CHK-02' && bad "exit0 script should not report" || ok "exit0 script → no violation"
+
+echo "== grep-ban anchor is a PATH PREFIX, not an exact file/dir (regression: silent 0-scan) =="
+KB7="$TMP/kb7"; mkkb "$KB7"; addconv "$KB7" CONV-12 '\bUser\.tier\b' 'backend/worker/push' true
+# backend/worker/push.py already exists (written above) and contains User.tier;
+# 'backend/worker/push' is neither an exact file nor an exact dir — only a prefix.
+OUT=$(python3 "$FORGE/check.py" --config "$KB7/kbforge.yaml" 2>&1) || true
+printf '%s' "$OUT" | grep -q 'backend/worker/push.py' && ok "prefix anchor 'backend/worker/push' still scans push.py" || bad "prefix anchor silently scanned nothing"
+
+echo "== avoid_pattern with a character class survives a RAW read (would be mangled by frontmatter()) =="
+KB8="$TMP/kb8"; mkkb "$KB8"
+mkdir -p "$REPO/backend/legacy"
+printf "if user.tier == 'x':\n    pass\n" > "$REPO/backend/legacy/raw.py"
+addconv "$KB8" CONV-13 '[Uu]se[r]\.tie[r]' 'backend/legacy' ""
+OUT=$(python3 "$FORGE/check.py" --config "$KB8/kbforge.yaml" 2>&1) || true
+printf '%s' "$OUT" | grep -q 'backend/legacy/raw.py' && ok "character-class avoid_pattern matched via raw read" || bad "character-class avoid_pattern lost/mangled"
 
 echo "check: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

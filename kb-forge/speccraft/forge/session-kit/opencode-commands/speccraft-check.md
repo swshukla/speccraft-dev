@@ -46,7 +46,7 @@ never mutates the product repo; it only reports.
      `check-for:` is shown as the report's `→ USE:` line (which invariant
      or claim the script is enforcing); `strict:` is one of the three ways
      to opt a single check into strict mode (see below). Both header lines
-     are optional. See `session-kit/evals/fixtures/CHK-01-alembic-metadata.sh`
+     are optional. See `session-kit/evals/fixtures/kb-check-examples/kb/normative/checks/CHK-01-alembic-metadata.sh`
      for a worked example (a real, runnable script kept as documentation —
      it is not wired into any product's checks).
 

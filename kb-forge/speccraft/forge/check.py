@@ -65,6 +65,7 @@ def _scan_file(fp, rx, repo, ban, out):
 
 def run_grep_bans(repo, bans):
     out = []
+    compiled = []
     for b in bans:
         try:
             rx = re.compile(b["pattern"])
@@ -73,16 +74,23 @@ def run_grep_bans(repo, bans):
                         "text": f"invalid avoid_pattern: {e}", "seam": b["seam"],
                         "strict": b["strict"]})
             continue
-        for anchor in (b["anchors"] or [""]):
-            base = os.path.join(repo, anchor)
-            if os.path.isfile(base):
-                _scan_file(base, rx, repo, b, out)
-            elif os.path.isdir(base):
-                for root, dirs, files in os.walk(base):
-                    dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
-                    for f in files:
-                        if f.endswith(SRC_EXT):
-                            _scan_file(os.path.join(root, f), rx, repo, b, out)
+        compiled.append((b, rx))
+    if not compiled:
+        return out
+    # Anchors are PATH PREFIXES (spec §4.2 / recall.py's `match`), not exact
+    # file/dir names — walk the repo once and match each source file to a
+    # ban by rel-path prefix, consistent with recall.
+    for root, dirs, files in os.walk(repo):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        for f in files:
+            if not f.endswith(SRC_EXT):
+                continue
+            fp = os.path.join(root, f)
+            rel = os.path.relpath(fp, repo)
+            for b, rx in compiled:
+                anchors = b["anchors"] or [""]
+                if any(rel.startswith(a.rstrip("/")) for a in anchors):
+                    _scan_file(fp, rx, repo, b, out)
     return out
 
 

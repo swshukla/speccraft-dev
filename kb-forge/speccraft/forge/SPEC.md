@@ -164,7 +164,7 @@ CI wiring (GitHub Actions):
 Example fixtures (documentation, not wired into any product's checks):
 `session-kit/evals/fixtures/kb-check-examples/kb/normative/conventions/CONV-11-*.md`
 (a grep-ban) and
-`session-kit/evals/fixtures/CHK-01-alembic-metadata.sh` (a custom script).
+`session-kit/evals/fixtures/kb-check-examples/kb/normative/checks/CHK-01-alembic-metadata.sh` (a custom script).
 
 ## The ship loop (write-back-on-ship, doc 06, laptop scale)
 
