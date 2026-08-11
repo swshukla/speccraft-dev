@@ -86,8 +86,50 @@ def run_grep_bans(repo, bans):
     return out
 
 
+def _script_header(path):
+    hdr = {}
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            s = line.strip()
+            if s.startswith("#!"):
+                continue
+            if s.startswith("#"):
+                body = s[1:].strip()
+                if ":" in body:
+                    k, val = body.split(":", 1)
+                    if k.strip() in ("check-for", "strict"):
+                        hdr[k.strip()] = val.strip()
+                continue
+            if s == "":
+                continue
+            break   # first non-comment, non-blank line ends the header
+    return hdr
+
+
 def run_check_scripts(repo, kbroot):
-    return []   # Source B — added in Task 2
+    import subprocess
+    cdir = os.path.join(kbroot, "kb", "normative", "checks")
+    out = []
+    if not os.path.isdir(cdir):
+        return out
+    for fn in sorted(os.listdir(cdir)):
+        path = os.path.join(cdir, fn)
+        if not (os.path.isfile(path) and os.access(path, os.X_OK)):
+            continue
+        hdr = _script_header(path)
+        strict = hdr.get("strict", "").lower() == "true"
+        try:
+            r = subprocess.run([path], cwd=repo, capture_output=True, text=True,
+                               env={**os.environ, "SPECCRAFT_REPO": repo}, timeout=120)
+        except Exception as e:
+            out.append({"check": fn, "file": "(script)", "line": 0,
+                        "text": f"check failed to run: {e}", "strict": strict})
+            continue
+        if r.returncode != 0:
+            msg = (r.stdout.strip() or r.stderr.strip() or f"exit {r.returncode}")[:500]
+            out.append({"check": fn, "file": "(script)", "line": 0, "text": msg,
+                        "seam": hdr.get("check-for", ""), "strict": strict})
+    return out
 
 
 def report(violations, global_strict):

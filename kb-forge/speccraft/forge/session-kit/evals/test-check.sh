@@ -54,5 +54,26 @@ KB5="$TMP/kb5"; mkkb "$KB5"
 { echo '---'; echo 'status: ratified'; echo 'anchors: [backend]'; echo 'seam: "x()"'; echo '---'; echo '## CONV-9'; } > "$KB5/kb/normative/conventions/CONV-9.md"
 python3 "$FORGE/check.py" --config "$KB5/kbforge.yaml" 2>&1 | grep -q '0 violation' && ok "no avoid_pattern → skipped" || bad "skipped"
 
+echo "== custom check script: nonzero → violation, exit0 → pass =="
+KB6="$TMP/kb6"; mkdir -p "$KB6/kb/normative/checks"; printf 'repo: %s\n' "$REPO" > "$KB6/kbforge.yaml"
+cat > "$KB6/kb/normative/checks/CHK-01-demo.sh" <<'EOF'
+#!/usr/bin/env bash
+# check-for: INV-1
+# strict: true
+echo "model Portfolio absent from target_metadata"
+exit 1
+EOF
+chmod +x "$KB6/kb/normative/checks/CHK-01-demo.sh"
+OUT=$(python3 "$FORGE/check.py" --config "$KB6/kbforge.yaml" 2>&1) || true; RC=0; python3 "$FORGE/check.py" --config "$KB6/kbforge.yaml" >/dev/null 2>&1 || RC=$?
+printf '%s' "$OUT" | grep -q 'Portfolio absent' && ok "script stdout surfaced" || bad "script stdout"
+printf '%s' "$OUT" | grep -q 'CHK-01' && [ "$RC" -ne 0 ] && ok "script strict header → nonzero exit" || bad "script strict"
+# a passing (exit 0) script produces no violation
+cat > "$KB6/kb/normative/checks/CHK-02-ok.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$KB6/kb/normative/checks/CHK-02-ok.sh"
+python3 "$FORGE/check.py" --config "$KB6/kbforge.yaml" 2>&1 | grep -q 'CHK-02' && bad "exit0 script should not report" || ok "exit0 script → no violation"
+
 echo "check: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
