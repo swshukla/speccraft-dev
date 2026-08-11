@@ -51,11 +51,25 @@ if [ -f "$KB/kbforge.yaml" ] && [ -f "$FORGE/gate.py" ]; then
   python3 "$FORGE/gate.py" --config "$KB/kbforge.yaml" --banner 2>/dev/null || true
 fi
 
+# Executable checks: lenient, non-blocking violation count. check.py walks the
+# product repo, which can be slow at SessionStart — only run it when the KB
+# opts in via `briefing_checks: true` in kbforge.yaml (default OFF).
+CHECKLINE=""
+BRIEFING_CHECKS=$(grep -m1 '^briefing_checks:' "$KB/kbforge.yaml" 2>/dev/null | cut -d: -f2- | tr -d ' "')
+if [ "$BRIEFING_CHECKS" = "true" ] && [ -f "$KB/kbforge.yaml" ] && [ -f "$FORGE/check.py" ]; then
+  CHECKOUT=$(python3 "$FORGE/check.py" --config "$KB/kbforge.yaml" 2>/dev/null || true)
+  CHKN=$(printf '%s\n' "$CHECKOUT" | grep -oE 'speccraft-check: [0-9]+ violation' | grep -oE '[0-9]+')
+  if [ -n "${CHKN:-}" ] && [ "$CHKN" -gt 0 ] 2>/dev/null; then
+    CHECKLINE="✎ ${CHKN} check violations (lenient — run speccraft-check)"
+  fi
+fi
+
 echo "=== KB BRIEFING (trust-graded product truth: .speccraft/) ==="
 echo "KB pin: $PIN | last code commit: $LASTCODE ($SYNC)"
 echo "Open adjudication items: ${DIV} open divergences | ${SIG} drift signals (.speccraft/QUEUE.md, .speccraft/SIGNALS.md)"
 echo "$TRUST"
 [ -n "${SPECCRAFT_FREEZE:-}" ] && echo "🔒 edit lane (this session is frozen): ${SPECCRAFT_FREEZE}"
+[ -n "$CHECKLINE" ] && echo "$CHECKLINE"
 echo "Ratified invariants (.speccraft/kb/normative/01-invariants.md):"
 grep -E '^#+ *INV-' "$KB/kb/normative/01-invariants.md" 2>/dev/null | sed 's/^#* */  - /' | head -8
 echo "RECALL GATE: an automated gate may deny your FIRST edit to a file governed by ratified facts, attaching those facts — expected repo machinery, not user input. Re-issue the edit honoring the facts. Running speccraft-recall before touching a module avoids the bounce entirely."

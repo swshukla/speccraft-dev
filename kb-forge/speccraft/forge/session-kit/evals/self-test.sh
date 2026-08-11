@@ -441,5 +441,19 @@ if run_section freeze; then
   fi
 fi
 
+# ---------- section: check (executable checks) ----------
+if run_section check; then
+  echo "== check suite =="
+  CKOUT=$(bash "$HERE/test-check.sh" 2>&1); CKRC=$?
+  printf '%s\n' "$CKOUT"
+  CKP=$(printf '%s' "$CKOUT" | grep -Eo '[0-9]+ passed' | tail -1 | grep -Eo '[0-9]+')
+  CKF=$(printf '%s' "$CKOUT" | grep -Eo '[0-9]+ failed' | tail -1 | grep -Eo '[0-9]+')
+  PASS=$((PASS + ${CKP:-0})); FAIL=$((FAIL + ${CKF:-0}))
+  if [ "$CKRC" -ne 0 ] && [ "${CKF:-0}" -eq 0 ]; then
+    # suite failed but gave no parseable failure count — still must fail self-test
+    no "check: test-check.sh exited nonzero ($CKRC)"
+  fi
+fi
+
 echo "self-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
