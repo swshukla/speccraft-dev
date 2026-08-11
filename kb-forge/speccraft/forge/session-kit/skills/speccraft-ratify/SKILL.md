@@ -33,9 +33,13 @@ description: Founder-only — use when the founder wants to answer adjudication 
      slugs) and its scope note ("banned on money paths, tolerated in
      pollers"); for a canonical-symbol seam also set `seam:` (the symbol +
      how to import it) and `avoid:` (the anti-pattern it replaces —
-     optional `avoid_pattern:`, a grep regex captured for later
-     enforcement, not read today). Then add a one-line index entry (id,
-     title, anchors, seam) to `kb/normative/03-conventions.md`.
+     optional `avoid_pattern:`, a grep regex). A convention that carries
+     `avoid_pattern:` becomes an executable grep-ban that
+     **speccraft-check** enforces against its `anchors:` (matches are
+     reported as violations, `seam:` shown as the fix); add `strict: true`
+     if it should fail the build even when the run itself is lenient. Then
+     add a one-line index entry (id, title, anchors, seam) to
+     `kb/normative/03-conventions.md`.
    - **Hypothesis killed** → mark it killed in place with a one-line reason
      (do not delete — the kill is part of the record).
 4. Move each answered item to `## Ruled — <date>` in QUEUE.md with a one-line
