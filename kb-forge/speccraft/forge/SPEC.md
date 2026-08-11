@@ -62,9 +62,10 @@ atomically in one commit, and one clone/push carries both. First deployment:
                           `anchors` (paths / `topic:` slugs), and — for a
                           canonical-symbol seam — `seam:` (the symbol to
                           use) / `avoid:` (the anti-pattern it replaces) /
-                          optional `avoid_pattern:` (grep regex, captured
-                          for later enforcement — Phase 4/5, not read
-                          today). `recall.py` renders a seam match as
+                          optional `avoid_pattern:` (grep regex; when
+                          present, `check.py` enforces it as a grep-ban —
+                          see "Executable checks" below). `recall.py`
+                          renders a seam match as
                           `→ USE: <seam>` / `→ AVOID: <avoid>` under the
                           fact. `03-conventions.md` stays a human-maintained
                           index (ratify adds one line per CONV by hand);
@@ -101,6 +102,7 @@ atomically in one commit, and one clone/push carries both. First deployment:
 | `dep-diff.py` | Per-commit: correlate manifest version changes vs the pinned table, flag version-pinned gotcha cards in `kb/inferred/09` that a bump may invalidate; `--queue` tiers card-matched + risk-tagged changes as work (routine bumps stay report-only) | no |
 | `recall.py` | Structural retrieval: match `anchors:` (path prefixes + `topic:` slugs) against files/topics about to be touched; trust-ordered output; explicit NO-COVERAGE warning (doc 06 Ground step) | no |
 | Agent passes | Archaeology / interview / confrontation / extraction — run as Claude Code sessions; read at pin, write `kb/inferred/` or interview → `kb/normative/` | yes |
+| `check.py` | Deterministic product checks: convention `avoid_pattern` grep-bans + custom `kb/normative/checks/` scripts — see "Executable checks" below. Standalone, not part of the ship loop or pre-commit | no |
 
 ## Drift detection (drift.py)
 
@@ -121,6 +123,48 @@ lines for aspect signatures:
 
 `--queue` appends both directions to QUEUE.md so refresh flows through
 adjudication like everything else.
+
+## Executable checks (check.py)
+
+`python3 <forge>/check.py --config <kbroot>/kbforge.yaml [--strict]` runs
+deterministic product checks and prints a report grouped by check id.
+Standalone — invoked by hand, by the `speccraft-check` procedure, or by CI;
+it is NOT wired into the product repo's `pre-commit` hook or the ship loop.
+
+Two sources feed it:
+- **Grep-bans** — any `kb/normative/conventions/CONV-NN-*.md` that carries
+  `avoid_pattern:` (a grep regex, read raw — not through the `#`-splitting
+  `frontmatter()` parser, so the regex survives intact). `check.py` greps
+  that convention's `anchors:` paths for the pattern; each matching line
+  is a violation, reported with the convention's `seam:` as the fix
+  (`→ USE: <seam>`). A convention without `avoid_pattern:` is skipped.
+- **Custom check scripts** — an executable at
+  `kb/normative/checks/CHK-NN-<slug>.sh` (any language). Run with
+  `cwd=<repo>`, `SPECCRAFT_REPO=<repo>` in its env, 120s timeout. Exit 0 =
+  pass; exit nonzero = one violation whose text is the script's stdout
+  (falling back to stderr, then `exit N`). An optional header —
+  `# check-for: INV-N` / `# strict: true` before the first real line — is
+  parsed for the report's `→ USE:` line and the strict lever below.
+
+Two modes: **lenient** (default) reports violations but exits 0; **strict**
+exits nonzero if ≥1 violation is *strict-effective*. A violation is
+strict-effective iff the run is globally strict (`--strict` on the CLI, or
+`check_mode: strict` in `kbforge.yaml`) OR that individual check opted in
+(`strict: true` in the convention's frontmatter, or a script's
+`# strict: true` header) — so one check can fail the build even inside an
+otherwise-lenient run. The report tags each violation `[strict]` or
+`[lenient]` accordingly.
+
+CI wiring (GitHub Actions):
+```yaml
+- name: speccraft-check
+  run: python3 kb-forge/speccraft/forge/check.py --config .speccraft/kbforge.yaml --strict
+```
+
+Example fixtures (documentation, not wired into any product's checks):
+`session-kit/evals/fixtures/kb-check-examples/kb/normative/conventions/CONV-11-*.md`
+(a grep-ban) and
+`session-kit/evals/fixtures/kb-check-examples/kb/normative/checks/CHK-01-alembic-metadata.sh` (a custom script).
 
 ## The ship loop (write-back-on-ship, doc 06, laptop scale)
 
