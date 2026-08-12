@@ -90,7 +90,7 @@ What it does, in order:
 
 | | |
 |---|---|
-| **Scaffolds the KB** | `.speccraft/` with `kbforge.yaml` (the product profile), `QUEUE.md` (the single adjudication queue), and the `kb/derived`, `kb/inferred`, `kb/normative`, `kb/decisions`, `ledger/` lanes. |
+| **Scaffolds the KB** | `.speccraft/` with `kbforge.yaml` (the product profile), `QUEUE.md` (the human adjudication queue) and `SIGNALS.md` (the mechanical drift / deps / advisories projection), and the `kb/derived`, `kb/inferred`, `kb/normative`, `kb/decisions`, `ledger/` lanes. |
 | **Harvests ground truth** | Runs `seed0` (structure/routes/models/churn), `assume0` (assumption "scars"), `dup0` (duplication & contradictions), `deps0` (dependency inventory) into `kb/derived/`, all pinned to your current `HEAD`. |
 | **Installs the procedures** | The seven `speccraft-*` skills into `.claude/skills/` (Claude Code), `.agents/skills/` (Codex + OpenCode, via the Agent Skills standard), and `.opencode/commands/`; plus `~/.codex/prompts/` once per machine. |
 | **Wires the agent context** | Appends the KB section to `AGENTS.md` and ensures `CLAUDE.md` imports it with `@AGENTS.md`. |
@@ -180,15 +180,16 @@ In Claude Code the skills fire by name (or automatically, when their description
 
 | Procedure | When to run it |
 |---|---|
-| **`speccraft-recall`** | **Before touching any module**, and before adding an integration or data fetch. Pulls the trust-graded facts governing the code you're about to change. This is the one you'll use every session. |
+| **`speccraft-recall`** | **Before touching any module**, and before adding an integration or data fetch. Pulls the trust-graded facts governing the code you're about to change — including the **seams** to build on and the anti-patterns to avoid for that module. This is the one you'll use every session. |
 | **`speccraft-decide`** | The moment you make a tradeoff — fixing a threshold, rejecting an alternative, picking a library. Writes an ADR-lite card to `kb/decisions/`, append-only. |
 | **`speccraft-diverge`** | When the task requires contradicting a ratified fact or `INV-*` invariant — or when you find code that already does. Stops and files it for your ruling instead of proceeding silently. |
 | **`speccraft-interview`** | Bootstrapping the KB, and again whenever product direction shifts. Elicits intent and invariants from you; no code scan can produce these. |
 | **`speccraft-ratify`** | *Founder-only.* Walk `QUEUE.md` and rule on items one at a time. The commit is the audit record. |
 | **`speccraft-prove`** | When someone asks you to prove one named invariant still holds. Re-verifies against current code and renders a cited proof — or refuses and files a divergence if the code contradicts it. |
+| **`speccraft-check`** | Runs the repo's **deterministic** checks — grep-bans compiled from your seam conventions, plus any custom asserts in `kb/normative/checks/`. Reports by default; fails the build only where you've opted a check into strict. Wire it into CI when a lane is clean enough to hold the line. |
 | **`speccraft-eval`** | *Founder-only.* Check whether the system is actually working: loop usage, KB truth, behavioral lift. |
 
-Day to day, the shape is: **recall → build → decide/diverge as they come up → commit** (the ship loop handles re-pinning), with **ratify** occasionally when the queue fills up.
+Day to day, the shape is: **recall → build → decide/diverge as they come up → commit** (the ship loop handles re-pinning), with **ratify** occasionally when the queue fills up, and **speccraft-check** in CI once a convention is worth enforcing.
 
 ---
 
@@ -244,6 +245,13 @@ It's not a lock against an intruder — you own the repo — it's a **signature*
 
 Sessions write only `QUEUE.md`, `kb/decisions/`, `kb/inferred/`, and `proposed` rows in `findings/`. Everything else is founder/machine.
 
+Around that signature sit four guardrails that keep drift from compounding while an agent runs unattended:
+
+- **Two anchors.** `source_commit` advances on every commit (mechanical freshness); `ratified_through` moves only when *you* ratify. Drift is measured against what's **ratified**, not merely what's pinned — so the trust boundary can't creep on its own.
+- **HIGH-debt gate.** You can't advance the ratified boundary while too many HIGH-severity findings sit open (a ceiling / age forcing function). Shipping past it is possible but leaves a logged override in `ledger/DEBT-WAIVERS.md`.
+- **Write-lane freeze.** A session can be confined to a single lane, so an agent editing `kb/inferred/` can't wander into `kb/normative/` in the same breath.
+- **Executable checks.** Seam conventions and invariants become *runnable* via `speccraft-check`: a convention's `avoid_pattern` compiles to a grep-ban, and `kb/normative/checks/` holds custom asserts. **Lenient by default** (it reports); **strict when you opt in** (it fails the build) — globally, per-run with `--strict`, or one critical check at a time. So you turn on teeth as each lane earns them, without wedging the ones that haven't.
+
 ---
 
 ## Layout
@@ -252,14 +260,17 @@ Sessions write only `QUEUE.md`, `kb/decisions/`, `kb/inferred/`, and `proposed` 
 your-repo/.speccraft/
 ├── kbforge.yaml       product profile: repo, components, risk_paths
 ├── KB-STATUS.md       auto-refreshed briefing (pin, open queue, invariants)
-├── QUEUE.md           the one adjudication queue — rulings are git commits
+├── QUEUE.md           the human adjudication queue — rulings are git commits
+├── SIGNALS.md         mechanical projection of drift / deps / advisories (never hand-edited)
 ├── kb/
 │   ├── derived/       machine-harvested, regenerated each commit (never hand-edited)
 │   ├── inferred/      agent hypotheses (pending-ratification)
 │   ├── normative/     ratified intent, invariants, conventions (human-only)
+│   │   └── checks/    custom executable asserts, run by speccraft-check
 │   └── decisions/     ADR-lite, captured at decision time (append-only)
-├── ledger/DIV-*.md    ruled divergences (fix-code / fix-model / accepted-deviation)
-└── findings/FINDINGS.md   the consolidated bug / work list
+├── ledger/DIV-*.md         ruled divergences (fix-code / fix-model / accepted-deviation)
+├── ledger/DEBT-WAIVERS.md  logged overrides of the HIGH-debt gate
+└── findings/FINDINGS.md    the consolidated bug / work list
 ```
 
 ---
