@@ -10,7 +10,9 @@
 
 ## 1. Problem
 
-Phase 4 made conventions enforceable, but only *textually*: a grep-ban (`avoid_pattern`) catches a known anti-pattern string. It cannot catch a **structural clone** — a copy of the seam's logic pasted elsewhere under different variable names, which greps clean but is the very duplication the seam exists to prevent (the audit's Telegram-send ×10, tier-gate ×3, cue-band ×2, Razorpay ×2). `dup0.py` already *detects* such clones by AST body-hash, but only writes them to a passive `kb/derived/dup-residue.md` residue report — it never fails anything, and it is blind to which seam is *ratified* as the single source.
+Phase 4 made conventions enforceable, but only *textually*: a grep-ban (`avoid_pattern`) catches a known anti-pattern string. It cannot catch a **copy-pasted clone** — the seam's implementation duplicated elsewhere, which no single grep pattern anticipates but is the very duplication the seam exists to prevent (the audit's Telegram-send ×10, tier-gate ×3, cue-band ×2, Razorpay ×2). `dup0.py` already *detects* such clones by AST body-hash, but only writes them to a passive `kb/derived/dup-residue.md` residue report — it never fails anything, and it is blind to which seam is *ratified* as the single source.
+
+**What "clone" means precisely here (`dup0.body_hash`):** it hashes `ast.dump(body, annotate_fields=False)` with the leading docstring dropped — so the match is an **identical AST including identifier names and literals** (a literal copy-paste, insensitive only to the docstring and formatting). A copy whose variables were *renamed*, or that was *reworded/refactored*, diverges and is **not** caught (see §4.4). This targets the copy-paste case — which is exactly how the audit's duplicates propagated — not fuzzy near-clones.
 
 Phase 5 turns clone-detection into a **build-failing gate scoped to ratified seams**: once a convention declares the one true implementation of a seam, a new structural clone of it is a violation.
 
@@ -33,7 +35,7 @@ Phase 5 turns clone-detection into a **build-failing gate scoped to ratified sea
 
 **Non-goals**
 - Collapsing the product's actual duplicated code (manual product work).
-- Fuzzy / near-clone similarity — exact `body_hash` only (see §4.4).
+- Fuzzy / near-clone similarity — exact `body_hash` only (see §4.4); a renamed or reworded copy diverges and is not caught. Honest, narrow guarantee: literal copy-paste.
 - Non-Python languages — `dup0`'s AST clone detection is Python-only; JS/others are a documented limitation (dup0 only same-names JS, doesn't body-hash it).
 - Changing `dup0`'s residue report or making dup0 itself a gate (fork decided: the gate lives in `speccraft-check`, dup0 stays a passive harvester).
 
@@ -60,13 +62,14 @@ Reuse: `from dup0 import body_hash, BORING`. (If importing `dup0` proves to have
 Identical to Phase 4 — a clone violation is strict-effective iff global (`--strict` / `check_mode: strict`) OR the convention's `canonical` seam is marked `strict: true`. Lenient (default) reports; strict fails the build. So you declare `canonical`, watch it report clones while you collapse the existing copies, then flip `strict: true` to hold the line — the graduated path.
 
 ### 4.4 Why exact `body_hash` (not fuzzy)
-A fresh copy-paste is structurally identical → same `body_hash` → caught at the moment it lands, before it drifts. Once a copy *drifts*, its hash diverges — but that's a different problem the other phases own (divergence/findings). Exact-hash keeps false positives near zero and reuses dup0 as-is. Scoping to the *declared canonical hash only* (not all clone clusters) means an unrelated trivial function never trips it.
+A literal copy-paste is byte-identical in AST → same `body_hash` → caught the moment it lands. `body_hash` includes identifier names and literals (it hashes `ast.dump(..., annotate_fields=False)`), so the guarantee is deliberately narrow: **identical copy, docstring/formatting aside.** A renamed or reworded copy diverges — that's the fuzzy-clone space we explicitly don't chase (false-positive risk, and drift is the other phases' job). Exact-hash keeps false positives near zero and reuses dup0 as-is; scoping to the *declared canonical hash only* (not all clone clusters) means an unrelated function never trips it. The honest framing for docs/users: this catches copy-paste, not disguised reimplementation.
 
 ## 5. Testing
 
 Extend `session-kit/evals/test-check.sh` (Source C block), wired via the existing `check` section:
-1. **Clone caught** — a CONV with `canonical: f.py::seam_fn` (nstmt≥4) + a second file with a structurally identical function (renamed vars) → a clone violation naming the convention + the canonical.
+1. **Clone caught** — a CONV with `canonical: f.py::seam_fn` (nstmt≥4) + a second file with an **identical copy** of that function → a clone violation naming the convention + the canonical.
 2. **Canonical itself not flagged** — the canonical site is excluded (no self-violation).
+2b. **Renamed copy NOT flagged (boundary)** — a copy of the seam with variables renamed → no violation, documenting the honest limit (`body_hash` is name-sensitive).
 3. **No clone → clean** — only the canonical exists → 0 violations, exit 0.
 4. **Trivial seam guard** — `canonical` pointing at a <4-statement function → a visible diagnostic violation, not a silent skip.
 5. **Missing canonical** — `canonical` naming a symbol that doesn't exist → diagnostic violation.
