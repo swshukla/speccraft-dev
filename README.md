@@ -29,6 +29,7 @@ It's built for the hard case — an **existing (brownfield) codebase** whose des
 ## Contents
 
 - [Why it exists](#why-it-exists)
+- [What you get](#what-you-get)
 - [Getting started](#getting-started)
 - [What gets checked in](#what-gets-checked-in)
 - [The commands](#the-commands)
@@ -53,6 +54,21 @@ Speccraft's answer is a **grounded ratchet**: seed a knowledge base from human-a
 <tr><td><b>3</b></td><td><b>Nothing becomes <code>ratified</code> except through a human</b><br/>Agents propose; you rule. A fact's trust state moves <code>pending → ratified → challenged</code>, never silently.</td></tr>
 <tr><td><b>4</b></td><td><b>Deterministic before generative</b><br/>Anything a regex or git can harvest is harvested by a no-LLM tool that <i>cannot hallucinate</i>; agents only interpret, and their output enters as an unratified hypothesis.</td></tr>
 </table>
+
+---
+
+## What you get
+
+Concretely, for the developer working in the repo:
+
+- **The rules, before you touch the code.** `speccraft-recall` pulls the trust-graded facts, the **seams** to build on, and the anti-patterns to avoid for the exact module you're about to change — so you don't rediscover a constraint the hard way, and neither does your agent.
+- **Knowledge harvested from what the code already proves.** Deterministic, pure-stdlib tools extract structure, invariants, dependency facts, and known CVEs — no LLM, no API keys, nothing to hallucinate.
+- **One queue for every discrepancy.** Drift, a new dependency, a fresh advisory — all land in a single human-ruled queue. You rule *fix-code*, *fix-model*, or *accept*, and the ruling is a git commit with your name on it.
+- **Drift caught on every commit, not months later.** The KB re-validates against the code as it changes; when they diverge you get a divergence to adjudicate, never a silent lie.
+- **Guardrails that actually run.** Turn a convention into a grep-ban, or drop a custom assert in `kb/normative/checks/`; `speccraft-check` reports by default and fails CI only where you've opted a check into strict — so you add teeth lane by lane, as each earns them.
+- **A forcing function against silent debt.** Critical findings can't quietly pile up under a ratified boundary — the HIGH-debt gate makes you rule on them or log an explicit override.
+- **Agents you can leave running.** Lane guards and write-lane freeze let an AI session work unattended without promoting its own guesses to truth or straying into human-only knowledge.
+- **The same workflow across your tools.** One `.speccraft/` KB — versioned in the repo, travelling with every clone — driving the same commands under Claude Code, Codex, and OpenCode.
 
 ---
 
