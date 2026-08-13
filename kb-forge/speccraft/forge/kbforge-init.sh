@@ -105,11 +105,13 @@ if ! grep -qE '"superpowers@[^"]*"[[:space:]]*:[[:space:]]*true' \
   echo "               /plugin install superpowers@claude-plugins-official"
 fi
 
-# mechanical seed (safe to re-run)
-python3 "$FORGE/seed0.py"   --config "$KB/kbforge.yaml"
-python3 "$FORGE/assume0.py" --config "$KB/kbforge.yaml"
-python3 "$FORGE/dup0.py"    --config "$KB/kbforge.yaml"
-python3 "$FORGE/deps0.py"   --config "$KB/kbforge.yaml"
+# mechanical seed (safe to re-run). The CLI pins SPECCRAFT_PYTHON to its own
+# interpreter — on Windows bare `python3` is usually absent or a Store stub.
+PY="${SPECCRAFT_PYTHON:-python3}"
+"$PY" "$FORGE/seed0.py"   --config "$KB/kbforge.yaml"
+"$PY" "$FORGE/assume0.py" --config "$KB/kbforge.yaml"
+"$PY" "$FORGE/dup0.py"    --config "$KB/kbforge.yaml"
+"$PY" "$FORGE/deps0.py"   --config "$KB/kbforge.yaml"
 
 # wire sessions + hooks for this clone
 "$FORGE/session-kit/install.sh" "$REPO"

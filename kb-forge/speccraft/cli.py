@@ -7,12 +7,81 @@ argv through.
 import argparse
 import importlib.resources
 import os
+import shutil
 import subprocess
 import sys
 
 
 def _forge_dir() -> str:
     return str(importlib.resources.files("speccraft") / "forge")
+
+
+def _posix(path: str) -> str:
+    """Git Bash does not treat \\ as a path separator.
+
+    Handing it C:\\Users\\x\\forge\\kbforge-init.sh makes dirname return '.',
+    so $FORGE resolves to the caller's cwd. C:/Users/x/... it handles fine.
+    """
+    return path.replace("\\", "/")
+
+
+def _find_bash() -> str:
+    """Locate a bash able to run the forge scripts.
+
+    Windows has no shebang handling, so the scripts cannot be exec'd
+    directly — we must name the interpreter. On Windows we prefer Git for
+    Windows over whatever `bash` is on PATH, because System32\\bash.exe is
+    the WSL launcher: it runs in a different filesystem namespace where the
+    C:/... paths we pass do not exist (they live under /mnt/c).
+    """
+    explicit = os.environ.get("SPECCRAFT_BASH")
+    if explicit:
+        return explicit
+
+    if os.name == "nt":
+        candidates = [
+            os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"),
+                         "Git", "bin", "bash.exe"),
+            os.path.join(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+                         "Git", "bin", "bash.exe"),
+            os.path.join(os.environ.get("LOCALAPPDATA", ""),
+                         "Programs", "Git", "bin", "bash.exe"),
+        ]
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                return candidate
+        found = shutil.which("bash")
+        # skip the WSL shim; it cannot see the Windows paths we hand it
+        if found and "system32" not in found.lower():
+            return found
+        return ""
+
+    found = shutil.which("bash")
+    if found:
+        return found
+    return "/bin/bash" if os.path.exists("/bin/bash") else ""
+
+
+def _run_forge_script(script: str, *script_args: str) -> int:
+    bash = _find_bash()
+    if not bash:
+        print(
+            "ERROR: speccraft needs bash to run its forge scripts, and none was found.\n"
+            "  Windows: install Git for Windows (https://git-scm.com/download/win),\n"
+            "           which provides bash.exe, then re-run this command.\n"
+            "  Or point speccraft at one explicitly: set SPECCRAFT_BASH=<path to bash>",
+            file=sys.stderr,
+        )
+        return 1
+
+    env = dict(os.environ)
+    # forge scripts call python3; on Windows that is typically missing (or is
+    # the Store alias stub) even where python exists. Pin the interpreter that
+    # is already running speccraft — it is known-good by construction.
+    env.setdefault("SPECCRAFT_PYTHON", _posix(sys.executable))
+
+    argv = [bash, _posix(script)] + [_posix(a) for a in script_args]
+    return subprocess.call(argv, env=env)
 
 
 def _ensure_kbforge_home_link(forge_dir: str) -> None:
@@ -30,17 +99,26 @@ def _ensure_kbforge_home_link(forge_dir: str) -> None:
             return
         os.remove(home_link)
     elif os.path.exists(home_link):
-        # real directory already there (e.g. pre-existing manual clone) — leave it alone
+        # real directory already there (e.g. pre-existing manual clone, or a
+        # Windows junction — which islink() does not report) — leave it alone
         return
 
-    os.symlink(forge_dir, home_link)
+    try:
+        os.symlink(forge_dir, home_link)
+    except OSError:
+        if os.name != "nt":
+            raise
+        # Windows symlinks need Developer Mode or admin; a directory junction
+        # needs neither and reads identically to the hooks' $HOME lookup.
+        subprocess.call(["cmd", "/c", "mklink", "/J", home_link, forge_dir],
+                        stdout=subprocess.DEVNULL)
 
 
 def cmd_init(args: argparse.Namespace) -> int:
     forge_dir = _forge_dir()
     _ensure_kbforge_home_link(forge_dir)
     script = os.path.join(forge_dir, "kbforge-init.sh")
-    return subprocess.call([script, args.repo])
+    return _run_forge_script(script, os.path.abspath(args.repo))
 
 
 def main(argv=None) -> int:

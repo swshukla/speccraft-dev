@@ -65,7 +65,7 @@ pipx install speccraft-cli     # or: pip install --user speccraft-cli
 speccraft --help
 ```
 
-> **Requirements:** `python3` ≥ 3.9 and `git`. `jq` is used only to merge Claude Code hook settings into a `.claude/settings.local.json` you already have. No API keys, no services, no LLM calls in the tooling itself — the harvesters are pure stdlib, and speccraft has zero runtime dependencies.
+> **Requirements:** `python3` ≥ 3.9, `git`, and `bash`. On **Windows**, bash comes with [Git for Windows](https://git-scm.com/download/win) — speccraft finds it automatically (set `SPECCRAFT_BASH` if you keep it somewhere unusual). `jq` is used only to merge Claude Code hook settings into a `.claude/settings.local.json` you already have; without it you get a one-line "merge by hand" notice instead of a failure. No API keys, no services, no LLM calls in the tooling itself — the harvesters are pure stdlib, and speccraft has zero runtime dependencies.
 
 > Want unreleased `main`? `pipx install git+https://github.com/swshukla/speccraft.git` instead.
 

@@ -73,7 +73,15 @@ echo "codex prompts: ensured in ~/.codex/prompts/"
 mkdir -p "$REPO/.claude"
 SL="$REPO/.claude/settings.local.json"
 if [ -f "$SL" ]; then
-  if jq -e '.hooks' "$SL" >/dev/null 2>&1; then
+  if ! command -v jq >/dev/null 2>&1; then
+    # no jq (common on Windows/Git Bash) — never guess at a JSON merge, and
+    # never abort the install this late over it
+    if grep -q "kb-briefing.sh" "$SL"; then
+      echo "settings.local.json: KB hooks already present"
+    else
+      echo "settings.local.json: jq not installed — merge $KIT/settings.json into $SL by hand"
+    fi
+  elif jq -e '.hooks' "$SL" >/dev/null 2>&1; then
     if grep -q "kb-briefing.sh" "$SL"; then
       echo "settings.local.json: KB hooks already present"
     else
