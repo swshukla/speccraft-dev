@@ -128,6 +128,7 @@ def run_check_scripts(repo, kbroot):
         strict = hdr.get("strict", "").lower() == "true"
         try:
             r = subprocess.run([path], cwd=repo, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace",
                                env={**os.environ, "SPECCRAFT_REPO": repo}, timeout=120)
         except Exception as e:
             out.append({"check": fn, "file": "(script)", "line": 0,

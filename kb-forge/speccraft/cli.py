@@ -79,6 +79,14 @@ def _run_forge_script(script: str, *script_args: str) -> int:
     # the Store alias stub) even where python exists. Pin the interpreter that
     # is already running speccraft — it is known-good by construction.
     env.setdefault("SPECCRAFT_PYTHON", _posix(sys.executable))
+    # The harvesters print unicode (arrows, checkmarks, box-drawing) to stdout.
+    # A Windows console's default codepage (e.g. cp1252) raises
+    # UnicodeEncodeError on those characters at print() time. This env var is
+    # inherited by every child process the bash script spawns (each harvester
+    # is a fresh `python.exe`, so per-process sys.stdout.reconfigure() calls
+    # would each need doing separately — setting it once here covers all of
+    # them). No-op on macOS/Linux, where stdout is already UTF-8.
+    env.setdefault("PYTHONIOENCODING", "utf-8")
 
     argv = [bash, _posix(script)] + [_posix(a) for a in script_args]
     return subprocess.call(argv, env=env)

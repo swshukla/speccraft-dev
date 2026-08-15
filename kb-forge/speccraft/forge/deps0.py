@@ -39,13 +39,13 @@ ADV_META = "advisories-meta.json"   # under kb/derived/
 def sh(cmd, cwd=None):
     try:
         return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
-                              timeout=120).stdout
+                              encoding="utf-8", errors="replace", timeout=120).stdout
     except Exception:
         return ""
 
 def load_config(path):
     cfg = {}
-    for line in open(path):
+    for line in open(path, encoding="utf-8"):
         line = line.split("#")[0].rstrip()
         if ":" in line and not line.startswith(" "):
             k, v = line.split(":", 1)
@@ -53,7 +53,7 @@ def load_config(path):
     return cfg
 
 def pinned_sha(kbroot):
-    for line in open(os.path.join(kbroot, "kb", "derived", "inventory.md")):
+    for line in open(os.path.join(kbroot, "kb", "derived", "inventory.md"), encoding="utf-8"):
         if line.startswith("source_commit:"):
             return line.split(":", 1)[1].strip()
     sys.exit("no source_commit pin in kb/derived/inventory.md")
@@ -93,7 +93,7 @@ def _split_req(line):
 
 def parse_requirements(path):
     deps = []
-    for line in open(path, errors="replace"):
+    for line in open(path, encoding="utf-8", errors="replace"):
         line = line.split("#")[0].strip()
         if not line or line.startswith("-"):
             continue
@@ -106,7 +106,7 @@ def parse_poetry_lock(path):
     """Lockfile = exact resolved versions (strongest signal)."""
     pinned = {}
     name = ver = None
-    for line in open(path, errors="replace"):
+    for line in open(path, encoding="utf-8", errors="replace"):
         line = line.strip()
         if line == "[[package]]":
             name = ver = None
@@ -121,7 +121,7 @@ def parse_poetry_lock(path):
 # ---- javascript -----------------------------------------------------------
 def parse_package_json(path):
     try:
-        data = json.load(open(path))
+        data = json.load(open(path, encoding="utf-8"))
     except Exception:
         return [], []
     runtime = list(data.get("dependencies", {}).items())
@@ -131,7 +131,7 @@ def parse_package_json(path):
 def parse_package_lock(path):
     pinned = {}
     try:
-        data = json.load(open(path))
+        data = json.load(open(path, encoding="utf-8"))
     except Exception:
         return pinned
     for key, meta in (data.get("packages") or {}).items():
@@ -164,14 +164,14 @@ def run_scanners(snap, inputs):
     without a live scanner)."""
     findings = {"python": None, "js": None}
     if "python" in inputs:
-        findings["python"] = open(inputs["python"], errors="replace").read()
+        findings["python"] = open(inputs["python"], encoding="utf-8", errors="replace").read()
     elif shutil.which("pip-audit") and find(snap, {"requirements.txt", "pyproject.toml"}):
         req = (find(snap, {"requirements.txt"}) or [None])[0]
         if req:
             out = sh(["pip-audit", "-r", req, "-f", "json", "--progress-spinner", "off"], snap)
             findings["python"] = out.strip() or "no output"
     if "js" in inputs:
-        findings["js"] = open(inputs["js"], errors="replace").read()
+        findings["js"] = open(inputs["js"], encoding="utf-8", errors="replace").read()
     elif shutil.which("npm") and find(snap, {"package-lock.json"}):
         lock_dir = os.path.dirname(find(snap, {"package-lock.json"})[0])
         out = sh(["npm", "audit", "--json"], lock_dir)
@@ -223,7 +223,7 @@ def _meta_path(kbroot):
 
 def load_meta(kbroot):
     try:
-        return json.load(open(_meta_path(kbroot)))
+        return json.load(open(_meta_path(kbroot), encoding="utf-8"))
     except Exception:
         return {}
 
@@ -257,7 +257,7 @@ def refresh_advisories(kbroot, snap, inputs, queue):
             counts[eco] = None
             new_ids[eco] = prev_ids.get(eco, {})
             continue
-        open(os.path.join(derived, f"advisories-{eco}.json"), "w").write(raw)
+        open(os.path.join(derived, f"advisories-{eco}.json"), "w", encoding="utf-8").write(raw)
         ids = _EXTRACT[eco](raw)
         new_ids[eco] = ids
         counts[eco] = len(ids)
@@ -270,7 +270,7 @@ def refresh_advisories(kbroot, snap, inputs, queue):
     scanned = any(findings[e] is not None for e in findings)
     meta = {"last_scan": date.today().isoformat() if scanned else prev.get("last_scan"),
             "counts": counts, "ids": new_ids}
-    json.dump(meta, open(_meta_path(kbroot), "w"), indent=2)
+    json.dump(meta, open(_meta_path(kbroot), "w", encoding="utf-8"), indent=2)
 
     if queue and new_items:
         existing = signals.read_lines(kbroot, "advisories")
@@ -367,7 +367,7 @@ def main():
     jsd = {name: resolve(name, spec, js_lock) for name, spec in js_dev}
 
     out = os.path.join(kbroot, "kb", "derived", "dependencies.md")
-    with open(out, "w") as fh:
+    with open(out, "w", encoding="utf-8") as fh:
         fh.write("---\nname: dependencies\nprovenance: derived\n"
                  f"source_commit: {pin}\nconfidence: certain\nanchors:\n"
                  "  - topic:dependencies\n---\n\n"

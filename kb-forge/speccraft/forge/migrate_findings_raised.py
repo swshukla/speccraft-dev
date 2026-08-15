@@ -17,7 +17,8 @@ BUG = re.compile(r"BUG-\d+")
 
 def _git(repo, *args):
     return subprocess.run(["git", "-C", repo, *args],
-                          capture_output=True, text=True).stdout.strip()
+                          capture_output=True, text=True,
+                          encoding="utf-8", errors="replace").stdout.strip()
 
 
 def _raised_for(repo, findings_rel, bug_id, fallback):

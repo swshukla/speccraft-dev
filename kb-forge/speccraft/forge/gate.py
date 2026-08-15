@@ -122,7 +122,8 @@ def _unreviewed(repo, ratified, source):
     try:
         out = subprocess.run(["git", "-C", repo, "rev-list", "--count",
                               f"{ratified}..{source}"], capture_output=True,
-                             text=True, check=True).stdout.strip()
+                             text=True, encoding="utf-8", errors="replace",
+                             check=True).stdout.strip()
         return int(out or "0")
     except Exception:
         return 0
@@ -134,7 +135,8 @@ def waive(kbroot, reason, repo):
     try:
         prev = subprocess.run(["git", "-C", repo, "show",
                                "HEAD:.speccraft/kb/derived/inventory.md"],
-                              capture_output=True, text=True, check=True).stdout
+                              capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", check=True).stdout
         for line in prev.splitlines():
             if line.startswith("ratified_through:"):
                 old = line.split(":", 1)[1].strip()

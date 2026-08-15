@@ -55,6 +55,16 @@ def test_init_pins_the_interpreter_for_the_script(calls, tmp_path):
     assert env["SPECCRAFT_PYTHON"] == sys.executable.replace("\\", "/")
 
 
+def test_init_pins_utf8_stdio_for_the_forge_scripts(calls, tmp_path):
+    """The harvesters print unicode (arrows, checkmarks, box-drawing) to
+    stdout. On Windows, a cp1252 console raises UnicodeEncodeError at
+    print() time unless PYTHONIOENCODING forces UTF-8. This env var is
+    inherited by every child python.exe the bash script spawns."""
+    _init(tmp_path)
+    env = calls["kwargs"]["env"]
+    assert env["PYTHONIOENCODING"] == "utf-8"
+
+
 def test_init_honours_an_explicit_bash(calls, tmp_path, monkeypatch):
     monkeypatch.setenv("SPECCRAFT_BASH", "/opt/custom/bash")
     _init(tmp_path)

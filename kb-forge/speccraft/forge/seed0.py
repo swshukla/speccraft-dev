@@ -21,7 +21,8 @@ RISK_PAT = re.compile(r"auth|login|session|token|payment|billing|subscri|trade|o
 
 def sh(cmd, cwd):
     try:
-        return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=120).stdout
+        return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=120).stdout
     except Exception:
         return ""
 
@@ -39,7 +40,7 @@ def snapshot(repo, sha, dest):
 
 def load_config(path):
     cfg = {}
-    for line in open(path):
+    for line in open(path, encoding="utf-8"):
         line = line.split("#")[0].rstrip()
         if ":" in line and not line.startswith(" "):
             k, v = line.split(":", 1)

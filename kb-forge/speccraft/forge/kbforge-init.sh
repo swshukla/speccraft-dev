@@ -6,6 +6,34 @@
 set -e
 REPO="${1:?usage: kbforge-init.sh /path/to/repo}"
 REPO="$(cd "$REPO" && pwd)"
+# On Git Bash (MSYS), plain `pwd` reports the MSYS-style path (/c/Users/x/...)
+# even when $REPO was handed in as a Windows path. That form only gets
+# auto-translated to a real Windows path when it is passed directly as an
+# argv to a native (non-MSYS) executable — e.g. `git`, or `python.exe` when
+# named on the command line. It is NOT translated when it is written as text
+# into a file, which is exactly what happens a few lines down (`repo: $REPO`
+# in kbforge.yaml): that file is later read back by python.exe as plain data,
+# and native Windows Python cannot resolve "/c/Users/x/proj" (it treats the
+# leading "/" as drive-relative on the *current* drive, not as an MSYS root).
+# So convert REPO to a Windows-resolvable form here, once, before it is ever
+# written anywhere. Prefer `cygpath -m` (mixed form, C:/Users/x/proj):
+# forward slashes are accepted uniformly by native Windows Python AND by
+# every bash/MSYS command $REPO still flows through below (cd, git -C, the
+# session-kit/install.sh call). `cygpath -w` (C:\Users\x\proj, backslashes)
+# would also satisfy Python, but backslashes are a needless risk in the bash
+# contexts here (escaping/glob edge cases) for zero benefit over -m — there
+# is no consumer downstream that requires backslashes specifically.
+# No-op on macOS/Linux: neither `cygpath` nor `pwd -W` exist there.
+if command -v cygpath >/dev/null 2>&1; then
+  REPO="$(cygpath -m "$REPO")"
+elif (cd "$REPO" && pwd -W) >/dev/null 2>&1; then
+  # Fallback for a Git-Bash-like shell with `pwd -W` but no cygpath binary.
+  # Deliberately re-`cd`s into $REPO (already an absolute path at this point)
+  # rather than calling bare `pwd -W`, which reports the CALLER's cwd, not
+  # $REPO — silently mis-resolving to the wrong directory whenever
+  # `speccraft init` is run against a repo other than the current one.
+  REPO="$(cd "$REPO" && pwd -W)"
+fi
 FORGE="$(cd "$(dirname "$0")" && pwd)"
 git -C "$REPO" rev-parse --show-toplevel >/dev/null 2>&1 || {
   echo "ERROR: $REPO is not a git repo. speccraft is git-native (the KB pins"

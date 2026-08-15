@@ -67,11 +67,12 @@ ASPECT_TARGET = {
 ADD_CAP = 40  # max additive findings shown per aspect
 
 def sh(cmd, cwd):
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True).stdout
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace").stdout
 
 def load_config(path):
     cfg = {}
-    for line in open(path):
+    for line in open(path, encoding="utf-8"):
         line = line.split("#")[0].rstrip()
         if ":" in line and not line.startswith(" "):
             k, v = line.split(":", 1)
@@ -80,7 +81,7 @@ def load_config(path):
 
 def pinned_sha(kbroot):
     inv = os.path.join(kbroot, "kb", "derived", "inventory.md")
-    for line in open(inv):
+    for line in open(inv, encoding="utf-8"):
         if line.startswith("source_commit:"):
             return line.split(":", 1)[1].strip()
     sys.exit("no source_commit pin found in kb/derived/inventory.md")
