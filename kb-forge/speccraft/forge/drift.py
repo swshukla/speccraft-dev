@@ -41,9 +41,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from recall import frontmatter, log_telemetry  # shared parser + telemetry
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__)))))  # kb-forge/ root, for the speccraft package
-from speccraft.forge import signals
+import signals                          # sibling module in this dir
 
 CITE = re.compile(r"([\w@./-]+/[\w.-]+\.(?:py|tsx|ts|jsx|js|md|yaml|yml|toml|sql)):(\d+)(?:-(\d+))?")
 HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")

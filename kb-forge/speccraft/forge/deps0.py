@@ -19,9 +19,8 @@ Usage: python3 deps0.py --config /path/to/<product>-kb/kbforge.yaml
 import argparse, json, os, re, shutil, subprocess, sys, tempfile
 from datetime import date
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__)))))  # kb-forge/ root, for the speccraft package
-from speccraft.forge import signals
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import signals                          # sibling module in this dir
 
 RISK = re.compile(r"razorpay|stripe|paypal|jwt|jose|passlib|bcrypt|oauth|"
                   r"crypto|telegram|boto3|sqlalchemy|alembic|celery|redis|"

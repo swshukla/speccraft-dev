@@ -26,9 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from deps0 import (parse_pyproject, parse_requirements, parse_poetry_lock,
                    parse_package_json, parse_package_lock, find, RISK, sh)
 from drift import load_config, pinned_sha, last_code_commit
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__)))))  # kb-forge/ root, for the speccraft package
-from speccraft.forge import signals
+import signals                          # sibling module in this dir
 
 MANIFESTS = {"requirements.txt", "pyproject.toml", "poetry.lock",
              "package.json", "package-lock.json", "pnpm-lock.yaml"}
