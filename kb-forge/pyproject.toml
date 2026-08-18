@@ -31,6 +31,20 @@ speccraft = "speccraft.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["speccraft*"]
+# forge/ is a tree of standalone scripts executed by path (by whatever python3
+# the git hook has), NOT an importable subpackage — it has no __init__.py and its
+# scripts import each other as siblings. Disable PEP 420 namespace discovery so it
+# is never picked up as a package; package-data below is what ships the tree.
+namespaces = false
 
 [tool.setuptools.package-data]
-speccraft = ["forge/**/*"]
+# Whether forge/** descends into dot-directories is setuptools-version dependent:
+# 83 excludes them, 84 includes them. The eval fixtures under
+# session-kit/evals/fixtures/*/.speccraft/ therefore need explicit patterns, or
+# their presence in the wheel depends on whichever setuptools the build env
+# resolves. Pinned explicitly so every build ships the same tree.
+speccraft = [
+  "forge/**/*",
+  "forge/**/.speccraft/*",
+  "forge/**/.speccraft/**/*",
+]
