@@ -100,6 +100,22 @@ session start → speccraft-recall (ground in ratified truth)
    → feeds the next session
 ```
 
+**When a ship-loop step fails.** The loop is detached and logs to `$TMPDIR`, so
+a broken step cannot reach your terminal. Every step's exit code is collected
+and banners into `.speccraft/KB-STATUS.md` — committed, and injected into every
+agent session at startup — with the per-step detail in the untracked
+`.speccraft/.shiploop-failure.log`. The loop still re-pins and commits (the pin
+must keep advancing), but a partially refreshed KB can no longer read as clean.
+The banner clears itself on the next clean run. Two env vars:
+
+- `KBFORGE_PYTHON` — interpreter for the forge steps. Defaults to the one
+  speccraft was installed with, read off its console-script shebang. The forge
+  never imports repo code, so this is independent of your project's Python; it
+  wants the *newest* available, because an old one silently under-analyzes
+  (`ast.parse` skips newer syntax, `tomllib` is absent before 3.11).
+- `KB_SHIPLOOP_SYNC=1` — run the loop in the foreground instead of detached.
+  For debugging a bad run and for the eval suite; commits never wait on it.
+
 - **`speccraft-recall`** — before touching a module, pull its ratified facts, invariants, existing integrations, and known bugs (injected automatically on file-edit in Claude Code).
 - **`speccraft-decide`** — record a tradeoff *at decision time*, so it's never lost to archaeology later.
 - **`speccraft-diverge`** — never silently violate a ratified fact; file it for a ruling.

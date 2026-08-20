@@ -6,12 +6,41 @@
 # Guards: commits touching only .speccraft/ never re-trigger (kills recursion
 # from the loop's own kb: commit); linked-worktree commits skipped; lockfile
 # collapses rapid commit bursts into one run.
+#
+# Failure surfacing: the loop is detached and its log lives in $TMPDIR, so a
+# dead step used to leave no trace while the re-pin commit went through anyway
+# — a partially refreshed KB that read as clean. Every step's exit code is now
+# collected and handed to kb-status.sh, which banners it into KB-STATUS.md:
+# committed, and injected into every agent session at startup. The loop still
+# commits (the pin must keep advancing), but it can no longer commit silently.
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 KBCFG=$ROOT/.speccraft/kbforge.yaml
 FORGE="${KBFORGE_HOME:-$HOME/.speccraft/kb-forge}"
 [ -f "$KBCFG" ] || exit 0
 LOG="${TMPDIR:-/tmp}/kb-shiploop.log"
 LOCK="${TMPDIR:-/tmp}/kb-shiploop-$(basename "$ROOT").lock"
+FAILLOG=$ROOT/.speccraft/.shiploop-failure.log
+
+# The forge is a static analyzer: it never imports or executes repo code (only
+# ast.parse), and the advisory scanners are separate binaries resolved with
+# shutil.which. So it does not need the REPO's interpreter — it needs the
+# newest one available. Too old and it degrades silently: dup0's
+# `except SyntaxError: continue` skips files whose syntax outruns the parser,
+# and deps0's tomllib import sits inside `except Exception: return`, yielding
+# an empty dependency table on <3.11. Bare `python3` is whatever the shell
+# happens to resolve (a conda env, a system 3.9), so prefer the interpreter
+# speccraft itself was installed with, read off its console-script shebang —
+# no path arithmetic, which is the assumption that broke the forge before.
+pick_python() {
+  [ -n "${KBFORGE_PYTHON:-}" ] && { printf '%s' "$KBFORGE_PYTHON"; return; }
+  sc=$(command -v speccraft 2>/dev/null) || sc=
+  if [ -n "$sc" ]; then
+    shb=$(sed -n '1s|^#!\([^ ]*python[0-9.]*\).*|\1|p' "$sc" 2>/dev/null)
+    [ -n "$shb" ] && [ -x "$shb" ] && { printf '%s' "$shb"; return; }
+  fi
+  printf 'python3'
+}
+PY=$(pick_python)
 
 # in a linked worktree, --git-dir differs from --git-common-dir: skip
 [ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ] && exit 0
@@ -22,19 +51,78 @@ git diff-tree --no-commit-id --name-only -r HEAD | grep -qv '^.speccraft/' || ex
 # already running: skip (the running loop, or the next commit, catches up)
 if ! mkdir "$LOCK" 2>/dev/null; then exit 0; fi
 
-(
-  trap 'rmdir "$LOCK"' EXIT
+shiploop() {
+  trap 'rmdir "$LOCK" 2>/dev/null' EXIT
   echo "--- ship loop $(date) [$ROOT] ---"
-  python3 "$FORGE/drift.py"   --config "$KBCFG" --queue --demote
-  python3 "$FORGE/dep-diff.py" --config "$KBCFG" --queue
-  python3 "$FORGE/decay.py"   --config "$KBCFG"
-  python3 "$FORGE/seed0.py"   --config "$KBCFG"
-  python3 "$FORGE/assume0.py" --config "$KBCFG"
-  python3 "$FORGE/dup0.py"    --config "$KBCFG"
-  python3 "$FORGE/deps0.py"   --config "$KBCFG" --queue
-  "$FORGE/session-kit/hooks/kb-status.sh"
-  "$FORGE/session-kit/evals/telemetry-report.sh" --kb "$ROOT/.speccraft"
+  echo "--- interpreter: $PY ---"
+  : > "$FAILLOG"          # this run only; a clean run leaves it empty
+  FAILED=
+
+  # No `set -e`: one dead step must not mask the state of the six others, and
+  # the KB is more useful partially refreshed than not refreshed at all. Every
+  # step runs; the failures are collected rather than fatal.
+  step() {  # $1=label, rest=command
+    lbl=$1; shift
+    out="${TMPDIR:-/tmp}/kb-shiploop-step.$$"
+    if "$@" > "$out" 2>&1; then
+      cat "$out"
+    else
+      rc=$?
+      echo "!! ship-loop step FAILED: $lbl (exit $rc)"
+      cat "$out"
+      { echo "=== $lbl (exit $rc) ==="; cat "$out"; echo; } >> "$FAILLOG"
+      FAILED="$FAILED $lbl"
+    fi
+    rm -f "$out"
+  }
+
+  step drift    "$PY" "$FORGE/drift.py"    --config "$KBCFG" --queue --demote
+  step dep-diff "$PY" "$FORGE/dep-diff.py" --config "$KBCFG" --queue
+  step decay    "$PY" "$FORGE/decay.py"    --config "$KBCFG"
+  step seed0    "$PY" "$FORGE/seed0.py"    --config "$KBCFG"
+  step assume0  "$PY" "$FORGE/assume0.py"  --config "$KBCFG"
+  step dup0     "$PY" "$FORGE/dup0.py"     --config "$KBCFG"
+  step deps0    "$PY" "$FORGE/deps0.py"    --config "$KBCFG" --queue
+
+  # Silent degradation is the failure mode exit codes cannot see. deps0 parses
+  # manifests under `except Exception: return`, so a malformed pyproject.toml,
+  # a bad package.json, or a pre-3.11 interpreter produces an EMPTY dependency
+  # table and exits 0 — a stale KB wearing a success's clothes. If the repo
+  # tracks a manifest but the derived table has no entries, say so.
+  DEPFILE=$ROOT/.speccraft/kb/derived/dependencies.md
+  case " $FAILED " in
+    *" deps0 "*) ;;   # already reported; do not double-count
+    *)
+      if git -C "$ROOT" ls-files \
+           | grep -qE '(^|/)(requirements\.txt|pyproject\.toml|package\.json)$' \
+         && [ -f "$DEPFILE" ] && ! grep -q '^- `' "$DEPFILE"; then
+        echo "!! ship-loop: dependencies.md is empty but the repo tracks a manifest"
+        { echo "=== deps0(empty-inventory) ==="
+          echo "repo tracks a dependency manifest, but $DEPFILE has no entries."
+          echo "deps0 swallows manifest parse errors — check the manifest and \$PY ($PY)."
+          echo; } >> "$FAILLOG"
+        FAILED="$FAILED deps0(empty-inventory)"
+      fi ;;
+  esac
+
+  # kb-status.sh reads this and banners it into KB-STATUS.md. Same shell, so
+  # the variable carries across without a state file. Empty on a clean run,
+  # which is what makes the banner self-clearing.
+  KB_SHIPLOOP_FAILED=$(echo "$FAILED" | sed 's/^ *//')
+  export KB_SHIPLOOP_FAILED
+  step kb-status "$FORGE/session-kit/hooks/kb-status.sh"
+  step telemetry "$FORGE/session-kit/evals/telemetry-report.sh" --kb "$ROOT/.speccraft"
+
+  [ -s "$FAILLOG" ] || rm -f "$FAILLOG"
   cd "$ROOT" && git add .speccraft && \
     KB_SHIPLOOP=1 git commit -q -m "kb: ship-loop re-pin @$(grep -m1 '^source_commit:' .speccraft/kb/derived/inventory.md | awk '{print $2}')" -- .speccraft || true
-) >> "$LOG" 2>&1 &
+}
+
+# KB_SHIPLOOP_SYNC runs the loop in the foreground so the eval suite (and a
+# human debugging a bad run) can observe it finish. Commits never wait on it.
+if [ -n "${KB_SHIPLOOP_SYNC:-}" ]; then
+  shiploop >> "$LOG" 2>&1
+else
+  shiploop >> "$LOG" 2>&1 &
+fi
 exit 0

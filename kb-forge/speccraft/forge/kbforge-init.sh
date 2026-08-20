@@ -78,6 +78,14 @@ if [ -d "$OLD" ] && { [ -f "$OLD/kbforge.yaml" ] || [ -d "$OLD/kb" ]; }; then
   fi
 fi
 
+# The ship loop drops a failure log next to the KB. `git add .speccraft` skips
+# ignored files, so this keeps the loop's own diagnostics out of the kb: commit.
+# Written on every run, not just fresh installs — existing KBs predate it.
+mkdir -p "$KB"
+if ! grep -qx '.shiploop-failure.log' "$KB/.gitignore" 2>/dev/null; then
+  echo '.shiploop-failure.log' >> "$KB/.gitignore"
+fi
+
 if [ -f "$KB/kbforge.yaml" ]; then
   echo ".speccraft/ already exists in $REPO — running installer only."
 else

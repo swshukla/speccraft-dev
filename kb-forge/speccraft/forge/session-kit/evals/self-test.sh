@@ -455,5 +455,18 @@ if run_section check; then
   fi
 fi
 
+# ---------- section: shiploop (ship-loop failure surfacing) ----------
+if run_section shiploop; then
+  echo "== shiploop suite =="
+  SLOUT=$(bash "$HERE/test-shiploop-failure.sh" 2>&1); SLRC=$?
+  printf '%s\n' "$SLOUT"
+  SLP=$(printf '%s' "$SLOUT" | grep -Eo '[0-9]+ passed' | tail -1 | grep -Eo '[0-9]+')
+  SLF=$(printf '%s' "$SLOUT" | grep -Eo '[0-9]+ failed' | tail -1 | grep -Eo '[0-9]+')
+  PASS=$((PASS + ${SLP:-0})); FAIL=$((FAIL + ${SLF:-0}))
+  if [ "$SLRC" -ne 0 ] && [ "${SLF:-0}" -eq 0 ]; then
+    no "shiploop: test-shiploop-failure.sh exited nonzero ($SLRC)"
+  fi
+fi
+
 echo "self-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
